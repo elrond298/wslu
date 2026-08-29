@@ -11,14 +11,7 @@
 </div>
 
 > [!IMPORTANT]
-> The project is being discontinued.
-
-> **ATTENTION!**
->
-> Built-in versions of wslu in Ubuntu are no longer supported by me.
->
-> If you have problems, please check whther you are using the [PPA version of wslu](https://launchpad.net/~wslutilities/+archive/ubuntu/wslu). If not, please report to the Ubuntu WSL team; However, the PPA version of wslu will address most issue that come from the built-in version.
-
+> This is a self-use repository maintained for the author's own needs.
 This is a collection of utilities for the Windows Subsystem for Linux (WSL), such as converting Linux paths to Windows paths or creating Linux application shortcuts on the Windows Desktop.
 
 - Requires at least Windows 10 Creators Update;
@@ -26,10 +19,73 @@ This is a collection of utilities for the Windows Subsystem for Linux (WSL), suc
 - Supports WSL2;
 - Supports Windows 11.
 
-|              | English                                          | 简体中文                                               | 正體中文                                               | Esperanto                                           |
-| ------------ | ------------------------------------------------ | ------------------------------------------------------ | ------------------------------------------------------ | --------------------------------------------------- |
-| General      | [Visit](https://wslutiliti.es/wslu/)             | [Visit](https://wslutiliti.es/wslu/zh-CN/)             | [Visit](https://wslutiliti.es/wslu/zh-TW/)             | [Visit](https://wslutiliti.es/wslu/eo/)             |
-| Installation | [Visit](https://wslutiliti.es/wslu/install.html) | [Visit](https://wslutiliti.es/wslu/zh-CN/install.html) | [Visit](https://wslutiliti.es/wslu/zh-TW/install.html) | [Visit](https://wslutiliti.es/wslu/eo/install.html) |
+
+## Installation
+
+Install this repository directly from source inside WSL:
+
+```bash
+git clone https://github.com/wslutilities/wslu.git
+cd wslu
+make
+sudo make install
+```
+
+The build requires Bash, GNU Make, and gzip. By default, executables are installed in `/usr/bin`, manpages in `/usr/share/man`, shared resources in `/usr/share/wslu`, and configuration in `/etc/wslu`.
+
+- `PREFIX` changes the installation prefix for executables and shared files. For example, `PREFIX=/usr/local` installs them under `/usr/local/bin` and `/usr/local/share`; configuration remains under `/etc/wslu`.
+- `DESTDIR` prepends a staging root to every installed path. It is intended for building a package or inspecting the install tree without modifying the system.
+
+Use the same values for both the build and install steps because they are embedded in the generated scripts.
+
+Install under `/usr/local`:
+
+```bash
+make clean
+make PREFIX=/usr/local
+sudo make PREFIX=/usr/local install
+```
+
+Stage a package tree under `stage/` without `sudo`:
+
+```bash
+make clean
+make PREFIX=/usr DESTDIR="$PWD/stage"
+make PREFIX=/usr DESTDIR="$PWD/stage" install
+```
+
+This creates `stage/usr/bin`, `stage/usr/share`, and `stage/etc/wslu`.
+
+To update an existing checkout:
+
+```bash
+git pull
+make clean
+make
+sudo make install
+```
+
+## Guide
+
+After installation, run `man 7 wslu` for the overview, `man 1 <command>` for a command's complete options, or `<command> --help` for a short summary.
+
+| Command | Purpose | Manual |
+| --- | --- | --- |
+| `wslact` | Run WSL actions such as time synchronization, drive mounting, and memory reclamation. | [`docs/wslact.1`](docs/wslact.1) |
+| `wslclip` | Read from or write to the Windows clipboard without X or Wayland. | [`docs/wslclip.1`](docs/wslclip.1) |
+| `wslfetch` | Display WSL and Windows system information. | [`docs/wslfetch.1`](docs/wslfetch.1) |
+| `wslgsu` | Create WSL startup tasks with Windows Task Scheduler. | [`docs/wslgsu.1`](docs/wslgsu.1) |
+| `wslsys` | Print WSL and Windows system information. | [`docs/wslsys.1`](docs/wslsys.1) |
+| `wslusc` | Create Windows Desktop shortcuts for WSL commands. | [`docs/wslusc.1`](docs/wslusc.1) |
+| `wslvar` | Read Windows environment and shell-folder variables. | [`docs/wslvar.1`](docs/wslvar.1) |
+| `wslview` | Open URLs, files, and folders with Windows applications. Aliases: `wview`, `wslstart`, and `wstart`. | [`docs/wslview.1`](docs/wslview.1) |
+| `wslupath` | Convert between Windows and WSL path forms. Deprecated. | [`docs/wslupath.1`](docs/wslupath.1) |
+
+All commands accept `--debug` and `--verbose` through the shared wslu header.
+
+### Configuration
+
+The installed defaults are in `/usr/share/wslu/conf`. Override them, in load order, with `/etc/wslu/conf`, `/etc/wslu/custom.conf`, `$HOME/.config/wslu/conf`, or `$HOME/.wslurc`. See [`src/etc/conf`](src/etc/conf) for available settings and each command's manpage for command-specific behavior.
 
 ## Contributors
 
