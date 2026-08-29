@@ -5,21 +5,98 @@ wa_gs_commd=""
 wa_gs_dscp=""
 wa_gs_name=""
 wa_gs_user="root"
+user_set=0
+command_set=0
 
-help_short="wslgsu [-u USERNAME] [-n NAME] [-S] SERVICE/COMMAND\nwslgsu [-hvw]"
+help_short="wslgsu [-u USERNAME] [-n NAME] [-S] SERVICE_OR_COMMAND\nwslgsu [-n NAME] -w\nwslgsu [-hv]"
+help_details='Create a Windows Task Scheduler task that runs at Windows logon.
 
-while [ "$1" != "" ]; do
+Arguments:
+  COMMAND             A command line to run inside the current WSL distribution.
+  SERVICE_OR_COMMAND  With -S, this is a Linux service name passed to
+                      "service NAME start". Without -S, it is a command line.
+  USERNAME            Existing Linux user used by wsl.exe; default: root.
+  NAME                Label in WSLUtilities_Actions_Startup_NAME_RANDOM, where
+                      RANDOM is a six-character suffix. Defaults to the service
+                      name, first command word, or Wakeup with --wakeup.
+
+Options:
+  -u, --user USERNAME   Run the service or command as USERNAME.
+  -n, --name NAME       Set the generated task label.
+  -S, --service         Start a Linux service instead of executing a command line.
+  -w, --wakeup          Create a no-op wake task; may only combine with --name.
+  -h, --help            Show this help.
+  -v, --version         Show the wslu version.
+
+The command requires Windows build 1903 or newer. It registers the task for the
+current Windows user at logon with a two-minute delay and displays a UAC prompt.
+
+Examples:
+  wslgsu -u alice -n backup "/home/alice/backup.sh"
+  wslgsu -S ssh
+  wslgsu -n KeepWSLReady -w'
+
+PARSED_ARGUMENTS=$(getopt -n "${wslu_util_name##*/}" -o +hvwu:n:S --long help,version,wakeup,user:,name:,service -- "$@")
+#shellcheck disable=SC2181
+if [ "$?" != "0" ]; then
+	help "$wslu_util_name" "$help_short"
+	exit 22
+fi
+
+eval set -- "$PARSED_ARGUMENTS"
+while :; do
 	case "$1" in
-		-w|--wakeup) isWakeup=1; break;;
-		-u|--user) shift; wa_gs_user="$1"; shift;;
-		-n|--name) shift; wa_gs_name="$1"; shift;;
+		-w|--wakeup) isWakeup=1; shift;;
+		-u|--user)
+			if [ -z "$2" ] || [[ "$2" == -* ]]; then
+				error_echo "$1 requires USERNAME." 22
+				exit 22
+			fi
+			wa_gs_user="$2"
+			user_set=1
+			shift 2;;
+		-n|--name)
+			if [ -z "$2" ] || [[ "$2" == -* ]]; then
+				error_echo "$1 requires NAME." 22
+				exit 22
+			fi
+			wa_gs_name="$2"
+			shift 2;;
 		-S|--service) isService=1; shift;;
-		-h|--help) help "wslact" "$help_short"; exit;;
+		-h|--help) help "$0" "$help_short"; exit;;
 		-v|--version) version; exit;;
-		*) wa_gs_commd="$*";break;;
+		--)
+			shift
+			if [ "$#" -gt 0 ]; then
+				command_set=1
+				wa_gs_commd="$*"
+			fi
+			break;;
+		*) error_echo "Unexpected option: $1" 22; exit 22;;
 	esac
 done
 
+if [ "$isWakeup" -eq 1 ]; then
+	if [ "$command_set" -eq 1 ]; then
+		error_echo "--wakeup does not accept a service or command." 22
+		exit 22
+	fi
+	if [ "$isService" -eq 1 ] || [ "$user_set" -eq 1 ]; then
+		error_echo "--wakeup can only be combined with --name." 22
+		exit 22
+	fi
+fi
+
+if [ "$isWakeup" -eq 0 ]; then
+	if [ "$command_set" -eq 0 ]; then
+		error_echo "No service or command provided." 21
+		exit 21
+	fi
+	if [ -z "$wa_gs_commd" ]; then
+		error_echo "SERVICE_OR_COMMAND cannot be empty." 22
+		exit 22
+	fi
+fi
 debug_echo "isService: $isService"
 debug_echo "isWakeup: $isWakeup"
 debug_echo "wa_gs_commd: $wa_gs_commd"
@@ -27,25 +104,26 @@ debug_echo "wa_gs_dscp: $wa_gs_dscp"
 debug_echo "wa_gs_name: $wa_gs_name"
 
 wslutmpbuild=$(wslu_get_build)
-[ "$wslutmpbuild" -ge "$BN_MAY_NINETEEN" ] || (echo "This tool is not supported before version 1903."; exit 34)
+if ! [[ "$wslutmpbuild" =~ ^[0-9]{1,9}$ ]]; then
+	error_echo "Unable to determine the Windows build number." 34
+	exit 34
+fi
+if [ "$wslutmpbuild" -lt "$BN_MAY_NINETEEN" ]; then
+	error_echo "This tool requires Windows build 1903 or newer." 34
+	exit 34
+fi
 
 if [[ "$wa_gs_commd" != "" ]] || [[ $isWakeup -eq 1 ]]; then
 	debug_echo "command or wakeup exist, executing"
-	tmp_location="$(wslvar -s TMP)"
-	tpath="$(double_dash_p "$tmp_location")" # Windows Temp, Win Double Sty.
-	tpath_linux="$(wslpath "$tmp_location")" # Windows Temp, Linux WSL Sty.
 	script_location_win="$(wslvar -s USERPROFILE)\\wslu" #  Windows wslu, Win Double Sty.
 	script_location="$(wslpath "$script_location_win")" # Windows wslu, Linux WSL Sty.
 
-	debug_echo "tmp_location: $tmp_location"
-	debug_echo "tpath: $tpath"
-	debug_echo "tpath_linux: $tpath_linux"
 	debug_echo "script_location_win: $script_location_win"
 	debug_echo "script_location: $script_location"
 
 	# Check presence of sudo.ps1 and 
-	wslu_file_check "$script_location" "sudo.ps1"
-	wslu_file_check "$script_location" "runHidden.vbs"
+	wslu_file_check "$script_location" "sudo.ps1" "?!R"
+	wslu_file_check "$script_location" "runHidden.vbs" "?!R"
 
 	# check if it is a service, a command or it just want to wakeup
 	if [[ $isWakeup -eq 1 ]]; then
@@ -55,7 +133,7 @@ if [[ "$wa_gs_commd" != "" ]] || [[ $isWakeup -eq 1 ]]; then
 			debug_echo "No name given, using default"
 			wa_gs_name="Wakeup"
 		fi
-		wa_gs_commd="wsl.exe -d $WSL_DISTRO_NAME echo"
+		wa_gs_commd="wsl.exe -d \"$WSL_DISTRO_NAME\" echo"
 		wa_gs_dscp="Wake up WSL Distro $WSL_DISTRO_NAME when computer start up; Generated By WSL Utilities"
 	elif [[ $isService -eq 1 ]]; then
 	# service
@@ -65,7 +143,7 @@ if [[ "$wa_gs_commd" != "" ]] || [[ $isWakeup -eq 1 ]]; then
 			debug_echo "No name given, using default"
 			wa_gs_name="$wa_gs_commd"
 		fi
-		wa_gs_commd="wsl.exe -d $WSL_DISTRO_NAME -u $wa_gs_user service $wa_gs_commd start"
+		wa_gs_commd="wsl.exe -d \"$WSL_DISTRO_NAME\" -u \"$wa_gs_user\" service \"$wa_gs_commd\" start"
 		wa_gs_dscp="Start service $wa_gs_name from $WSL_DISTRO_NAME when computer start up; Generated By WSL Utilities"
 	else
 	# command
@@ -76,7 +154,7 @@ if [[ "$wa_gs_commd" != "" ]] || [[ $isWakeup -eq 1 ]]; then
 			wa_gs_name=$(echo "$wa_gs_commd" | awk '{print $1}')
 			wa_gs_name=${wa_gs_name##*/}
 		fi
-		wa_gs_commd="wsl.exe -d $WSL_DISTRO_NAME -u $wa_gs_user $wa_gs_commd"
+		wa_gs_commd="wsl.exe -d \"$WSL_DISTRO_NAME\" -u \"$wa_gs_user\" $wa_gs_commd"
 		wa_gs_dscp="Executing following command \`$wa_gs_name\` from $WSL_DISTRO_NAME when computer start up; Generated By WSL Utilities"
 	fi
 
@@ -88,24 +166,28 @@ if [[ "$wa_gs_commd" != "" ]] || [[ $isWakeup -eq 1 ]]; then
 
 	debug_echo "tmp_rand: $tmp_rand"
 
-	# shellcheck disable=SC2028
-	tee "$tpath_linux"/tmp.ps1 >/dev/null << EOF 
-Import-Module 'C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1';
-\$action = New-ScheduledTaskAction -Execute 'C:\\Windows\\System32\\wscript.exe' -Argument '$script_location_win\\runHidden.vbs $wa_gs_commd';
-\$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries;
-\$trigger =  New-ScheduledTaskTrigger -AtLogOn -User \$env:userdomain\\\$env:username; \$trigger.Delay = 'PT2M';
-\$task = New-ScheduledTask -Action \$action -Trigger \$trigger -Description \"$wa_gs_dscp\" -Settings \$settings;
-Register-ScheduledTask -InputObject \$task -TaskPath '\\' -TaskName 'WSLUtilities_Actions_Startup_${wa_gs_name}_${tmp_rand}' | out-null;
-EOF
+	action_argument=$(winps_string "\"$script_location_win\\runHidden.vbs\" $wa_gs_commd")
+	task_description=$(winps_string "$wa_gs_dscp")
+	task_name=$(winps_string "WSLUtilities_Actions_Startup_${wa_gs_name}_${tmp_rand}")
 
-	debug_echo "$(cat "$tpath_linux"/tmp.ps1)"
+	# shellcheck disable=SC2028
+	task_script=$(cat << EOF
+\$ErrorActionPreference = 'Stop';
+Import-Module 'C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1';
+\$action = New-ScheduledTaskAction -Execute 'C:\\Windows\\System32\\wscript.exe' -Argument $action_argument;
+\$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries;
+\$trigger = New-ScheduledTaskTrigger -AtLogOn -User \$env:userdomain\\\$env:username; \$trigger.Delay = 'PT2M';
+\$task = New-ScheduledTask -Action \$action -Trigger \$trigger -Description $task_description -Settings \$settings;
+Register-ScheduledTask -InputObject \$task -TaskPath '\\' -TaskName $task_name | out-null;
+EOF
+) || error_echo "Failed to construct task script." 1
+	encoded_task=$(printf %s "$task_script" | iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n') || error_echo "Failed to encode task script." 1
+	debug_echo "$task_script"
 	echo "${warn} WSL Utilities is adding \"${wa_gs_name}\" to Task Scheduler; A UAC Prompt will show up later. Allow it if you know what you are doing."
-	if winps_exec "$script_location_win"\\sudo.ps1 "$tpath"\\tmp.ps1; then
+	if winps_exec "& ($(winps_string "$script_location_win\\sudo.ps1")) powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand '$encoded_task'"; then
 		debug_echo "Task Scheduler added"
-		rm -rf "$tpath_linux/tmp.ps1"
 		echo "${info} Task \"${wa_gs_name}\" added."
 	else
-		rm -rf "$tpath_linux/tmp.ps1"
 		error_echo "Adding Task \"${wa_gs_name}\" failed." 1
 	fi
 else

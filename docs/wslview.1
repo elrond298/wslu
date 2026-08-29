@@ -4,11 +4,15 @@
 .B wslview, wview, wslstart, wstart
 - Component of WSL Utilities
 .SH SYNOPSIS
-.B wslview, wview, wslstart, wstart
-.RB [ \-ehsvurE ]
+.B wslview
+.RB [ OPTIONS ]
+.I LINK_OR_FILE
 .PP
-.B wslview, wview, wslstart, wstart
-.I LINK/FILE
+.B wslview
+.BR \-r | \-u | \-e
+.PP
+.B wslview
+.RB [ \-hv ]
 .SH DESCRIPTION
 This is a file viewer on WSL that allows you to open files and folders from WSL in Windows and a fake web browser that allows opening urls in your default browser on Windows 10.
 .SH OPTIONS
@@ -19,17 +23,20 @@ print a simple help.
 .B -v, --version
 print current version.
 .TP
+.B -E, --engine \fIENGINE\fR
+Select \fBpowershell\fR, \fBcmd\fR, or \fBcmd_explorer\fR as the Windows launcher.
+.TP
 .B -s, --skip-validation-check
 skip url validation check.
 .TP
 .B -u, --unreg-as-browser
-remove \fBwslview\fR as the default WSL web browser.
+Remove wslview browser registration. This action accepts no LINK_OR_FILE or launch options.
 .TP
 .B -r, --reg-as-browser
-register \fBwslview\fR as the default WSL web browser.
+Register wslview through update-alternatives. This action accepts no LINK_OR_FILE or launch options.
 .TP
 .B -e, --export-as-browser
-register \fBwslview\fR as the default WSL web browser using export method.
+Set BROWSER in existing .bashrc, .zshrc, and .kshrc files. This action accepts no LINK_OR_FILE or launch options.
 .SH CONFIGURATION
 .TP
 .B WSLVIEW_DEFAULT_ENGINE
@@ -37,8 +44,8 @@ default method to start websites/folders/files. Default type is "powershell". He
 .nf
 .in +4
 powershell: use powershell.exe to start website/folder/file
-cmd: use cmd.exe to start website/folder/file
-cmd_explorer: use explorer.exe via cmd.exe to start website/folder/file
+cmd: compatibility alias for PowerShell Start
+cmd_explorer: use explorer.exe directly
 .in
 .fi
 .TP

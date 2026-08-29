@@ -30,6 +30,7 @@
 #    wsl-kernel
 #    wsl-package-count
 #    wsl-ip
+#    win-system-type
 #    wsl-systemd-status
 # 'wsl-version' will be always ignored since it is builtin in wslfetch.
 # WSLFETCH_INFO_SECTION="windows-build,windows-rel-branch,wsl-release,wsl-kernel,windows-uptime"
@@ -53,15 +54,15 @@
 
 # wslvar: Default Type of variable to get when not specifying option. Default type is 1.
 # Available Types:
-#    1: User Shell Folders
-#    2: Windows Environment Variables
+#    1: Windows Environment Variables
+#    2: User Shell Folders
 # WSLVAR_DEFAULT_VARTYPE=1
 
 # wslview: default method to start websites/folders/files. Default type is "powershell".
 # Available options:
 #    powershell: use powershell.exe to start website/folder/file
-#    cmd: use cmd.exe to start website/folder/file
-#    cmd_explorer: use explorer.exe via cmd.exe to start website/folder/file
+#    cmd: compatibility alias for PowerShell Start
+#    cmd_explorer: use explorer.exe directly
 # WSLVIEW_DEFAULT_ENGINE="powershell"
 
 # wslview: whether to skip validation check. Default is 1, which is not skipping. Can be either `0` or `1`.

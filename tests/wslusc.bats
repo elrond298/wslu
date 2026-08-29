@@ -17,15 +17,17 @@ teardown() {
 @test "wslusc - Help" {
   run out/wslusc --help
   [ "${lines[0]}" = "wslusc - Part of wslu, a collection of utilities for Windows Subsystem for Linux (WSL)" ]
-  [ "${lines[1]}" = "Usage: wslusc [-IsgN] [-d SHORTCUT_FILE] [-e PATH] [-n NAME] [-i FILE] COMMAND" ]
-  [ "${lines[2]}" = "wslusc [-hv]" ]
+  [ "${lines[1]}" = "Usage: wslusc [OPTIONS] COMMAND [ARGUMENTS ...]" ]
+  [ "${lines[2]}" = "wslusc -d SHORTCUT_FILE" ]
+  [ "${lines[3]}" = "wslusc [-hv]" ]
 }
 
 @test "wslusc - Help - Alt." {
   run out/wslusc -h
   [ "${lines[0]}" = "wslusc - Part of wslu, a collection of utilities for Windows Subsystem for Linux (WSL)" ]
-  [ "${lines[1]}" = "Usage: wslusc [-IsgN] [-d SHORTCUT_FILE] [-e PATH] [-n NAME] [-i FILE] COMMAND" ]
-  [ "${lines[2]}" = "wslusc [-hv]" ]
+  [ "${lines[1]}" = "Usage: wslusc [OPTIONS] COMMAND [ARGUMENTS ...]" ]
+  [ "${lines[2]}" = "wslusc -d SHORTCUT_FILE" ]
+  [ "${lines[3]}" = "wslusc [-hv]" ]
 }
 
 @test "wslusc - non-exist file" {

@@ -2,17 +2,22 @@
 .SH NAME
 .B wslgsu
 - Component of WSL Utilities
-.SH SYNOSIS
+.SH SYNOPSIS
 .B wslgsu
 .RB [ \-u
 .IR USERNAME ]
 .RB [ \-n 
 .IR NAME ]
 .RB [ \-S ]
+.I SERVICE_OR_COMMAND
+.PP
+.B wslgsu
+.RB [ \-n
+.IR NAME ]
+.B \-w
 .PP
 .B wslgsu
 .RB [ \-hv ]
-.I SERVICE/COMMAND
 .SH DESCRIPTION
 This tool allows you to generate a WSL startup Task using the Windows Task Scheduler.
 .SH OPTIONS
@@ -23,7 +28,7 @@ Print a simple help.
 .B -v, --version
 Print current version.
 .TP
-.B -u, --username \fIUSERNAME\fR
+.B -u, --user \fIUSERNAME\fR
 Use a separate user to execute the command/service. By default it's \fIroot\fR.
 .TP
 .B -n, --name \fINAME\fR
@@ -31,6 +36,9 @@ Add an explicit name instead of the default of automatically extracting a name f
 .TP
 .B -S, --service
 Using this option means you are addng a system service. without \fB-S\fR, you are adding a command to system. 
+.TP
+.B -w, --wakeup
+Create a no-op task that wakes the current WSL distribution. It may only be combined with \fB--name\fR.
 .SH AUTHOR
 Created by Patrick Wu <me@patrickwu.space>
 .SH REPORTING BUGS

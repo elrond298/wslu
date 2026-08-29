@@ -4,16 +4,13 @@
 - Component of WSL Utilities
 .SH SYNOPSIS
 .B wslusc
-.RB [ \-IsgN ]
-.RB [ \-d
-.IR SHORTCUT_FILE ]
-.RB [ \-e
-.IR PATH ]
-.RB [ \-n 
-.IR NAME ]
-.RB [ \-i
-.IR FILE ]
+.RB [ OPTIONS ]
 .I COMMAND
+.RI [ ARGUMENTS ...]
+.PP
+.B wslusc
+.B \-d
+.I SHORTCUT_FILE
 .PP
 .B wslusc
 .RB [ \-hv ]
@@ -28,24 +25,24 @@ print a simple help
 print current version
 .TP
 .B -d, --shortcut-debug \fISHORTCUT_FILE\fR
-debug the generated shortcut file.
+Inspect an existing Windows Desktop shortcut. This mode cannot be combined with shortcut-creation options or COMMAND.
 .TP
 .B -g, --gui
 create a shortcut that links to a GUI application. 
 .TP
 .B -N, --native
-create a shortcut that uses the system builtin \'wslg.exe\' to launch the GUI application.
+With \fB--gui\fR, launch through wslg.exe. Requires Windows build 21332 or newer.
 .TP
-.B -i, --icon
-add an icon to the Windows Shortcut. Supports \fB\.ico\fR/\fB\.png\fR/\fB\.svg\fR\.
+.B -i, --icon \fIFILE\fR
+Add an icon to the Windows shortcut. Supports \fB.ico\fR, \fB.png\fR, \fB.svg\fR, and \fB.xpm\fR.
 .TP
 .B -s, --smart-icon
 This enables the smart icon detection. This feature requires \'wslpy\' to be installed.
 .TP
-.B -n, --name
+.B -n, --name \fINAME\fR
 add a different name other than the command name.
 .TP
-.B -e, --env
+.B -e, --env \fIENV\fR
 add a custom environment to your command. For example, if you want HiDPI support for a GTK app, add \fBexport GDK_SCALE=2;\fR in your command, like this: \fBwslusc ... \-e "export GDK_SCALE=2;" ...\fR
 .TP
 .B -I, --interactive

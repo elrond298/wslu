@@ -42,7 +42,7 @@ function serialize($a, $escape) {
 
 if($args[0] -eq '-do') {
 	$null, $dir, $parent_pid, $cmd = $args
-	$exit_code = sudo_do $parent_pid $dir (serialize $cmd)
+	$exit_code = sudo_do $parent_pid $dir $cmd
 	exit $exit_code
 }
 
@@ -57,12 +57,24 @@ $a = if ($args[0] -eq '-please' -or $args[0] -eq '-plz') {
 	serialize $args $true
 }
 
-$wd = serialize (convert-path $pwd) # convert-path in case pwd is a PSDrive
+$wd = convert-path $pwd # convert-path in case pwd is a PSDrive
+$commandText = $a -join ' '
+$scriptPath64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($pscommandpath))
+$workingDirectory64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($wd))
+$command64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($commandText))
+$bootstrap = @"
+`$scriptPath = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$scriptPath64'))
+`$workingDirectory = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$workingDirectory64'))
+`$command = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$command64'))
+& `$scriptPath -do `$workingDirectory $pid `$command
+exit `$lastexitcode
+"@
+$encodedBootstrap = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrap))
 
 $savetitle = $host.ui.rawui.windowtitle
 $p = new-object diagnostics.process; $start = $p.startinfo
 $start.filename = "powershell.exe"
-$start.arguments = "-noprofile & '$pscommandpath' -do $wd $pid $a`nexit `$lastexitcode"
+$start.arguments = "-NoProfile -EncodedCommand $encodedBootstrap"
 $start.verb = 'runas'
 $start.windowstyle = 'hidden'
 try { $null = $p.start() }
