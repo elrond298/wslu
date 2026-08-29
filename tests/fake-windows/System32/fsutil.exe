@@ -1,0 +1,8 @@
+#!/bin/bash
+printf 'fsutil.exe %s\n' "$*" >> "${WSLU_TEST_LOG:?}"
+if [[ $* == 'fsinfo drives' ]]; then
+  printf 'Drives: C:\\ D:\\\r\n'
+else
+  printf 'unexpected fsutil.exe call: %s\n' "$*" >&2
+  exit 97
+fi

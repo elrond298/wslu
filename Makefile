@@ -18,6 +18,8 @@ INSTEDMANOS := $(wildcard $(DESTDIR)$(PREFIX)/share/man/man1/wsl*)
 DATETMP = $(shell date +%Y-%m-%d)
 VERTMP = $(shell cat ./VERSION)
 
+.PHONY: all clean test test-fast test-integration test-manual shellcheck coverage
+
 all: doc
 	[ -d $(OUTPATH) ] || mkdir $(OUTPATH)
 	sed -e 's/VERSIONPLACEHOLDER/'$(VERTMP)'/' -e 's|PREFIXPLACEHOLDER|'$(PREFIX)'|' -e 's|DESTDIRPLACEHOLDER|'$(DESTDIR)'|' $(HEADER) > $(HEADER).tmp; \
@@ -72,11 +74,20 @@ clean:
 	rm -rf $(OUTPATH)
 	rm -rf $(OUTMANPATH)
 
-test: 
-	bats -r tests
+test: test-fast
+
+test-fast: all
+	bats tests/fast
+
+test-integration: all
+	bats tests/integration
+
+test-manual: all
+	@test "$$WSLU_RUN_MANUAL_TESTS" = 1 || { echo "Set WSLU_RUN_MANUAL_TESTS=1 to run disruptive tests." >&2; exit 1; }
+	bats tests/manual
 
 shellcheck:
 	shellcheck -P src/*
 
-coverage: 
-	kcov --include-path="./src,./out" ./tests/coverage bats -r tests
+coverage: all
+	kcov --include-path="./src,./out" ./tests/coverage bats tests/fast

@@ -5,22 +5,23 @@ on:
       - dev/**
   workflow_call:
 jobs:
-  sctests:
-    name: ShellCheck Tests
+  fasttests:
+    name: Fast Tests
     runs-on: ubuntu-20.04
-    steps: 
+    steps:
       - uses: actions/checkout@v4
-      - name: Install Pre-requisites
+      - name: Install prerequisites
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -qq shellcheck
-      - name: shellcheck
-        run: |
-          make shellcheck
-  codetests:
-    name: General Tests
+          sudo apt-get install -qq bats gzip make shellcheck
+      - name: ShellCheck
+        run: make shellcheck
+      - name: Hermetic tests
+        run: make test
+  windowstests:
+    name: Windows Integration Tests
     runs-on: windows-2019
-    needs: sctests
+    needs: fasttests
     steps:
       - name: Set git to use LF
         run: |
@@ -42,4 +43,4 @@ jobs:
         run: |
           make
           make install
-          make test
+          make test-integration

@@ -1,0 +1,8 @@
+#!/bin/bash
+printf 'wslvar %s\n' "$*" >> "${WSLU_TEST_LOG:?}"
+case "$*" in
+  '-l Desktop'|'--shell Desktop') printf 'C:\\Users\\Test\\Desktop\n' ;;
+  '-s USERPROFILE'|'--sys USERPROFILE') printf 'C:\\Users\\Test\n' ;;
+  '-s TMP'|'--sys TMP'|'-s TEMP'|'--sys TEMP') printf 'C:\\Temp\n' ;;
+  *) printf 'unexpected wslvar call: %s\n' "$*" >&2; exit 97 ;;
+esac

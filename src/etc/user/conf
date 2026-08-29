@@ -60,8 +60,8 @@
 
 # wslview: default method to start websites/folders/files. Default type is "powershell".
 # Available options:
-#    powershell: use powershell.exe to start website/folder/file
-#    cmd: compatibility alias for PowerShell Start
+#    powershell: use the Windows Shell application association through powershell.exe
+#    cmd: compatibility alias for the PowerShell shell launcher
 #    cmd_explorer: use explorer.exe directly
 # WSLVIEW_DEFAULT_ENGINE="powershell"
 

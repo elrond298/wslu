@@ -1,5 +1,11 @@
 #!/usr/bin/env bats
 
+load test_helper
+
+setup() {
+  require_windows_wsl
+}
+
 #wslsys testing
 @test "wslsys - No parameter" {
   run out/wslsys

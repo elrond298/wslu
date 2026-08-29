@@ -1,0 +1,13 @@
+#!/bin/bash
+printf 'powershell.exe' >> "${WSLU_TEST_LOG:?}"
+printf ' <%s>' "$@" >> "$WSLU_TEST_LOG"
+printf '\n' >> "$WSLU_TEST_LOG"
+case "$*" in
+  *ProgramFiles*|*UHJvZ3JhbUZpbGVz*) printf 'C:\\Program Files\r\n' ;;
+  *USERPROFILE*) printf 'C:\\Users\\Test\r\n' ;;
+  *TEMP*|*TMP*) printf 'C:\\Temp\r\n' ;;
+  *Desktop*|*RGVza3RvcA==*) printf 'C:\\Users\\Test\\Desktop\r\n' ;;
+  *Get-Clipboard*) printf '%s' "${WSLU_FAKE_CLIPBOARD:-}" ;;
+  *System.Windows.Forms*Clipboard*) : ;;
+  *) printf 'unexpected powershell.exe call: %s\n' "$*" >&2; exit 97 ;;
+esac

@@ -1,0 +1,6 @@
+#!/bin/bash
+printf 'cmd.exe' >> "${WSLU_TEST_LOG:?}"
+printf ' <%s>' "$@" >> "$WSLU_TEST_LOG"
+printf '\n' >> "$WSLU_TEST_LOG"
+printf 'unexpected cmd.exe call: %s\n' "$*" >&2
+exit 97

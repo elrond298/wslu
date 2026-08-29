@@ -1,8 +1,9 @@
 #!/usr/bin/env bats
 
-#wslsys testing
+load ../test_helper
+
 setup() {
-  export PATH="$PWD/out:$PATH"
+  setup_fake_windows
 }
 
 @test "wslfetch - No parameter" {

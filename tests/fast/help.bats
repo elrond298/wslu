@@ -1,7 +1,9 @@
 #!/usr/bin/env bats
 
+load ../test_helper
+
 setup() {
-  export PATH="$PWD/out:$PATH"
+  setup_fake_windows
 }
 
 @test "all commands provide self-contained help" {
@@ -24,7 +26,7 @@ setup() {
 
 @test "help explains parameter values and effects" {
   run out/wslview --help
-  [[ "$output" == *"powershell    PowerShell Start command"* ]]
+  [[ "$output" == *"powershell    Windows Shell association through PowerShell"* ]]
   [[ "$output" == *"cmd_explorer  explorer.exe invoked directly"* ]]
   [[ "$output" == *"WSLVIEW_SKIP_VALIDATION_CHECK=1"* ]]
   [[ "$output" == *"requires Windows build 1903"* ]]
@@ -280,7 +282,8 @@ setup() {
   run env TEST_INPUT="$BATS_TEST_TMPDIR/input" TEST_LOG="$BATS_TEST_TMPDIR/winps.log" "$BATS_TEST_TMPDIR/wslclip" "$content"
   [ "$status" -eq 0 ]
   [ "$(cat "$BATS_TEST_TMPDIR/input")" = "$content" ]
-  ! grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/winps.log"
+  run grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/winps.log"
+  [ "$status" -eq 1 ]
   grep -Fq 'Set-Clipboard -Value' "$BATS_TEST_TMPDIR/winps.log"
 }
 
@@ -295,23 +298,27 @@ setup() {
 
   run env TEST_LOG="$BATS_TEST_TMPDIR/view.log" "$BATS_TEST_TMPDIR/wslview" --skip-validation-check "https://example.com/$value"
   [ "$status" -eq 0 ]
-  ! grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/view.log"
+  run grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/view.log"
+  [ "$status" -eq 1 ]
   grep -Fq 'FromBase64String' "$BATS_TEST_TMPDIR/view.log"
 
   run env TEST_LOG="$BATS_TEST_TMPDIR/shortcut.log" "$BATS_TEST_TMPDIR/wslusc-debug" --shortcut-debug "$value.lnk"
   [ "$status" -eq 0 ]
-  ! grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/shortcut.log"
+  run grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/shortcut.log"
+  [ "$status" -eq 1 ]
   grep -Fq 'FromBase64String' "$BATS_TEST_TMPDIR/shortcut.log"
 
   name="'}; Write-Output INJECTED; '"
   run env TEST_LOG="$BATS_TEST_TMPDIR/var.log" "$BATS_TEST_TMPDIR/wslvar-safe" --sys "$name"
   [ "$status" -eq 0 ]
-  ! grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/var.log"
+  run grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/var.log"
+  [ "$status" -eq 1 ]
   grep -Fq 'FromBase64String' "$BATS_TEST_TMPDIR/var.log"
 
   run env TEST_LOG="$BATS_TEST_TMPDIR/var.log" "$BATS_TEST_TMPDIR/wslvar-safe" --shell "$name"
   [ "$status" -eq 0 ]
-  ! grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/var.log"
+  run grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/var.log"
+  [ "$status" -eq 1 ]
   grep -Fq 'FromBase64String' "$BATS_TEST_TMPDIR/var.log"
 
   run env TEST_TMP="$BATS_TEST_TMPDIR" TEST_LOG="$BATS_TEST_TMPDIR/task.log" "$BATS_TEST_TMPDIR/wslgsu-safe" --name "$value" echo "$value"
@@ -319,7 +326,8 @@ setup() {
   encoded_task=$(sed -n "s/.*-EncodedCommand '\([^']*\)'.*/\1/p" "$BATS_TEST_TMPDIR/task.log")
   [ -n "$encoded_task" ]
   printf %s "$encoded_task" | base64 -d | iconv -f UTF-16LE -t UTF-8 > "$BATS_TEST_TMPDIR/task.ps1"
-  ! grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/task.ps1"
+  run grep -Fq 'Write-Output INJECTED' "$BATS_TEST_TMPDIR/task.ps1"
+  [ "$status" -eq 1 ]
   grep -Fq 'FromBase64String' "$BATS_TEST_TMPDIR/task.ps1"
 }
 

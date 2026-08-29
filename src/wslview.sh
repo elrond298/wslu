@@ -14,8 +14,8 @@ Arguments:
                 path such as C:/Users/Public, or an existing Linux path. Linux
                 paths are converted to Windows paths before opening.
   ENGINE        Windows launcher to use:
-                  powershell    PowerShell Start command (default).
-                  cmd           Compatibility alias for PowerShell Start.
+                  powershell    Windows Shell association through PowerShell (default).
+                  cmd           Compatibility alias for the PowerShell shell launcher.
                   cmd_explorer  explorer.exe invoked directly.
   ACTION        Exactly one of --reg-as-browser, --unreg-as-browser, or
                 --export-as-browser. Actions do not accept LINK_OR_FILE or launch options.
@@ -34,8 +34,9 @@ Configuration defaults:
   WSLVIEW_DEFAULT_ENGINE=powershell
   WSLVIEW_SKIP_VALIDATION_CHECK=1   Validate URLs; set to 0 to skip validation.
 
-URL validation requires curl and sends an HTTP HEAD request. Opening Linux paths or
-Linux file: URLs requires Windows build 1903 or newer.
+URL validation uses curl to send an HTTP HEAD request. A failed probe does not
+rewrite the input as a filesystem path; the original URL is still opened. Opening
+Linux paths or Linux file: URLs requires Windows build 1903 or newer.
 
 Browser registration is unsupported on Arch Linux and Alpine Linux. The export
 method may edit .bashrc, .zshrc, and .kshrc in the home directory.
@@ -209,34 +210,24 @@ if [[ "$lname" != "" ]]; then
 		properfile_full_path="$(readlink -f "${lname}")"
 	fi
 	debug_echo "properfile_full_path: $properfile_full_path"
-	if [ "$skip_validation_check" -eq 0 ]; then
-		debug_echo "Skipping validation check"
-		is_valid_url=0
-  	else
-   		debug_echo "Validating whether if it is a link"
-		if url_validator "$lname"; then
-			is_valid_url=0
-		else
-			is_valid_url=1
-		fi
-	fi
-	if [[ "$is_valid_url" -eq 0 ]] && [ -z "$properfile_full_path" ]; then
-		debug_echo "It is a link"
-		target="$lname"
+	if [ -n "$properfile_full_path" ]; then
+		debug_echo "It is a Linux path"
+		target="$(wslpath -w "$properfile_full_path")"
 	elif [[ "$lname" =~ ^file:\/\/(\/)+[A-Za-z]\:.*$ ]] || [[ "$lname" =~ ^[A-Za-z]\:.*$ ]]; then
-		debug_echo "It is not a link; received windows absolute path/file protocol windows absolute path"
+		debug_echo "Received Windows absolute path or Windows file URL"
 		target="$lname"
 	else
-		debug_echo "It is not a link"
-		target="$(wslpath -w "${properfile_full_path:-$lname}" 2>/dev/null || echo "$lname")"
+		debug_echo "Treating input as a URL"
+		if [ "$skip_validation_check" -ne 0 ] && ! url_validator "$lname"; then
+			debug_echo "URL validation failed; preserving the original URL"
+		fi
+		target="$lname"
 	fi
 	debug_echo "target: $target"
-	if [[ "$WSLVIEW_DEFAULT_ENGINE" == "powershell" ]]; then
-		winps_exec "Start ($(winps_string "$target"))"
-	elif [[ "$WSLVIEW_DEFAULT_ENGINE" == "cmd" ]]; then
-		winps_exec "Start ($(winps_string "$target"))"
+	if [[ "$WSLVIEW_DEFAULT_ENGINE" == "powershell" || "$WSLVIEW_DEFAULT_ENGINE" == "cmd" ]]; then
+		winps_exec "\$ErrorActionPreference='Stop'; \$shell=New-Object -ComObject Shell.Application; \$shell.ShellExecute($(winps_string "$target"))"
 	elif [[ "$WSLVIEW_DEFAULT_ENGINE" == "cmd_explorer" ]]; then
-		winps_exec "& explorer.exe ($(winps_string "$target"))"
+		winps_exec "\$ErrorActionPreference='Stop'; & explorer.exe ($(winps_string "$target"))"
 	fi
 else
 	error_echo "No input, aborting" 21

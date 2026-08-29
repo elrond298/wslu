@@ -68,7 +68,9 @@ Following parameter is available for package building:
 - run `make` to build executables to `out` folder and manages to `out-docs` folder.
 - run `make doc` to build manpage only.
 - run `make clean` to remove `out` and `out-docs` folder.
-- run `make test` to run tests.
+- run `make test` to run the hermetic fast suite.
+- run `make test-integration` inside Windows-hosted WSL to run bounded real Windows integration tests.
+- run `WSLU_RUN_MANUAL_TESTS=1 make test-manual` only in a disposable environment to run disruptive tests.
 - run `make install` to install.
 - run `make res_install` to install just resources.
 - run `make uninstall` to uninstall.
@@ -155,8 +157,13 @@ For contributing, there are several functions and variables built-in the header 
 
 ### Test
 
-`wslu` use [bats](https://github.com/bats-core/bats-core) for testing. Please refer to [its guide](https://github.com/bats-core/bats-core#writing-tests) to write tests.
+`wslu` uses [Bats](https://github.com/bats-core/bats-core) for testing. Tests are divided by side effect:
 
+- `tests/fast/` uses isolated homes, fixture data, and fake Windows executables. It must pass without Windows, network access, installation, or privileges.
+- `tests/integration/` runs automatically in Windows-hosted WSL and may call real PowerShell, CMD, registry, `wslpath`, and clipboard APIs. Artifacts must stay in temporary paths and be cleaned.
+- `tests/manual/` may open applications, write Desktop shortcuts, request elevation, change time, mount drives, or drop caches. It requires explicit opt-in and is excluded from CI.
+
+Add deterministic parsing and command-construction coverage to the fast suite. Add a Windows integration test only when a real interoperability boundary provides additional confidence.
 ### Push Requests
 
 Make sure that the codes changed are tested.

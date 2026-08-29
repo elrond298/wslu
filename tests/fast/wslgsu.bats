@@ -1,5 +1,11 @@
 #!/usr/bin/env bats
 
+load ../test_helper
+
+setup() {
+  setup_fake_windows
+}
+
 #wslgsu testing
 @test "wslgsu - Help" {
   run out/wslgsu --help

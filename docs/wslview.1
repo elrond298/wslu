@@ -27,7 +27,7 @@ print current version.
 Select \fBpowershell\fR, \fBcmd\fR, or \fBcmd_explorer\fR as the Windows launcher.
 .TP
 .B -s, --skip-validation-check
-skip url validation check.
+Skip the curl HTTP HEAD probe. A failed probe normally leaves the original URL unchanged and does not convert it to a filesystem path.
 .TP
 .B -u, --unreg-as-browser
 Remove wslview browser registration. This action accepts no LINK_OR_FILE or launch options.
@@ -43,8 +43,8 @@ Set BROWSER in existing .bashrc, .zshrc, and .kshrc files. This action accepts n
 default method to start websites/folders/files. Default type is "powershell". Here are all available options:
 .nf
 .in +4
-powershell: use powershell.exe to start website/folder/file
-cmd: compatibility alias for PowerShell Start
+powershell: use the Windows Shell application association through powershell.exe
+cmd: compatibility alias for the PowerShell shell launcher
 cmd_explorer: use explorer.exe directly
 .in
 .fi

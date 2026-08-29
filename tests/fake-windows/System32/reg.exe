@@ -1,0 +1,11 @@
+#!/bin/bash
+cat >/dev/null
+printf 'reg.exe %s\n' "$*" >> "${WSLU_TEST_LOG:?}"
+case "$*" in
+  *CurrentBuild*) printf '\n    CurrentBuild    REG_SZ    22631\n\n' ;;
+  *DistributionName*) printf 'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\test\n    DistributionName    REG_SZ    %s\n' "${WSL_DISTRO_NAME:-TestDistro}" ;;
+  *' /v Flags'*) printf '\n    Flags    REG_DWORD    0x8\n\n' ;;
+  *PackageFamilyName*) exit 1 ;;
+  *OEMCP*) printf '\nHKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage\n    OEMCP    REG_SZ    65001\n' ;;
+  *) printf 'unexpected reg.exe call: %s\n' "$*" >&2; exit 97 ;;
+esac

@@ -1,5 +1,11 @@
 #!/usr/bin/env bats
 
+load ../test_helper
+
+setup() {
+  setup_fake_windows
+}
+
 #wslact testing
 @test "wslact - Help" {
   run out/wslact --help

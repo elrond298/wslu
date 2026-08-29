@@ -1,5 +1,11 @@
 #!/usr/bin/env bats
 
+load ../test_helper
+
+setup() {
+  setup_fake_windows
+}
+
 #header testing
 @test "Header - Colortesting 1" {
   color="$(. src/wslu-header;echo -e $black | cat -A)"
@@ -43,7 +49,7 @@
 
 @test "Header - Interop Prefix" {
   format="$(. src/wslu-header; echo "$(interop_prefix)")"
-  [ "$format" = "/mnt/" ]
+  [ "$format" = "$WSLU_TEST_ROOT/mnt/" ]
 }
 
 @test "Header - System Drive Prefix" {

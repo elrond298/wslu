@@ -1,5 +1,11 @@
 #!/usr/bin/env bats
 
+load test_helper
+
+setup() {
+  require_windows_wsl
+}
+
 #wslupath testing
 @test "wslupath - No parameter" {
   run out/wslupath

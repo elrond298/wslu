@@ -1,0 +1,24 @@
+#!/bin/bash
+printf 'wslpath %s\n' "$*" >> "${WSLU_TEST_LOG:?}"
+if [[ $1 == -w ]]; then
+  value=${2:-}
+  case "$value" in
+    "$WSLU_TEST_ROOT/mnt/c"*)
+      value=${value#"$WSLU_TEST_ROOT/mnt/c"}
+      value=${value//\//\\}
+      printf 'C:%s\n' "$value"
+      ;;
+    "$WSLU_TEST_ROOT"/*)
+      value=${value#"$WSLU_TEST_ROOT"}
+      value=${value//\//\\}
+      printf '\\\\wsl.localhost\\TestDistro%s\n' "$value"
+      ;;
+    *) printf 'unexpected wslpath -w outside test root: %s\n' "$value" >&2; exit 97 ;;
+  esac
+else
+  value=${*: -1}
+  value=${value#?:}
+  value=${value//\\//}
+  while [[ $value == *//* ]]; do value=${value//\/\//\/}; done
+  printf '%s%s\n' "${WSLU_TEST_ROOT:?}/mnt/c" "$value"
+fi

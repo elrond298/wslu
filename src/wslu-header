@@ -25,7 +25,8 @@ wslu_util_name="${wslu_util_fullpath##*/}"
 # Version
 wslu_version=VERSIONPLACEHOLDER
 wslu_prefix="PREFIXPLACEHOLDER"
-wslu_dest_dir="DESTDIRPLACEHOLDER"
+wslu_dest_dir="${WSLU_DESTDIR:-DESTDIRPLACEHOLDER}"
+wslu_proc_dir="${WSLU_PROC_DIR:-/proc}"
 
 # Speed up script by using unicode.
 LC_ALL=C
@@ -47,8 +48,8 @@ bash_version_minor=$(echo "$bash_version_full" | cut -d ' ' -f 4 | cut -d '.' -f
 
 # conf handling module
 __wsl_conf_read() {
-	if [ -f /etc/wsl.conf ]; then
-		tmp="$(sed -nr "/^\[${1}\]/ { :l /^${2}[ ]*=/ { s/[^=]*=[ ]*//; p; q;}; n; b l;}" /etc/wsl.conf)"
+	if [ -f "${wslu_dest_dir}/etc/wsl.conf" ]; then
+		tmp="$(sed -nr "/^\[${1}\]/ { :l /^${2}[ ]*=/ { s/[^=]*=[ ]*//; p; q;}; n; b l;}" "${wslu_dest_dir}/etc/wsl.conf")"
 		if [ -n "$tmp" ]; then
 			if [ ${#tmp} -ge 2 ]; then
 				if [ "${tmp:0:1}" == '"' ] && [ "${tmp: -1}" == '"' ]; then
@@ -72,11 +73,11 @@ if __wsl_conf_read interop enabled | grep false >/dev/null; then
 	2. under [interop] section, set enabled to true;
 	3. restart your distribution."
 	exit 1
-elif [ -f /proc/sys/fs/binfmt_misc/WSLInterop ] && grep -q '^disabled' /proc/sys/fs/binfmt_misc/WSLInterop; then
+elif [ -f "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop" ] && grep -q '^disabled' "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop"; then
     echo "WSL Interopability is temporarily disabled and WSL Utilities won't work. Please enable it by:
     # echo 1 > /proc/sys/fs/binfmt_misc/WSLInterop"
     exit 1
-elif [ -f /proc/sys/fs/binfmt_misc/WSLInterop-late ] && grep -q '^disabled' /proc/sys/fs/binfmt_misc/WSLInterop-late; then
+elif [ -f "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop-late" ] && grep -q '^disabled' "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop-late"; then
     echo "WSL Interopability is temporarily disabled and WSL Utilities won't work. Please enable it by:
     # echo 1 > /proc/sys/fs/binfmt_misc/WSLInterop-late"
     exit 1
@@ -175,9 +176,9 @@ if [ -f "${wslu_dest_dir}/etc/wslu/conf" ]; then
 	source "${wslu_dest_dir}/etc/wslu/conf"
 fi
 
-if [ -f "/etc/wslu/custom.conf" ]; then
-	debug_echo "/etc/wslu/custom.conf found, sourcing"
-	source "/etc/wslu/custom.conf"
+if [ -f "${wslu_dest_dir}/etc/wslu/custom.conf" ]; then
+	debug_echo "${wslu_dest_dir}/etc/wslu/custom.conf found, sourcing"
+	source "${wslu_dest_dir}/etc/wslu/custom.conf"
 fi
 
 if [ -f "$HOME/.config/wslu/conf" ]; then
@@ -264,7 +265,7 @@ function windows_system32 {
 }
 
 function wslu_get_build {
-	build=$("$(windows_system32)"/reg.exe query "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion" /v CurrentBuild | tail -n 2 | head -n 1 | sed -e 's|\r||g')
+	build=$("$(windows_system32)"/reg.exe query "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion" /v CurrentBuild </dev/null | tail -n 2 | head -n 1 | sed -e 's|\r||g')
 	echo "${build##* }"
 }
 
@@ -272,9 +273,9 @@ function wslu_get_wsl_ver {
 	wslutmpbuild="$(( $(wslu_get_build) + 0 ))"
 	if [ $wslutmpbuild -ge $BN_MAY_NINETEEN ]; then
 		# The environment variable only available in 19H1 or later.
-		wslu_distro_regpath=$("$(windows_system32)"/reg.exe query "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss" /s /f DistributionName 2>&1 | sed -e 's|\r||g' | grep -B1 -e "$WSL_DISTRO_NAME$" | head -n1 )
-		if "$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v Flags &>/dev/null; then
-			wslu_distro_version=$("$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v Flags | tail -n 2 | head -n 1 | sed -e 's|\r||g')
+		wslu_distro_regpath=$("$(windows_system32)"/reg.exe query "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss" /s /f DistributionName </dev/null 2>&1 | sed -e 's|\r||g' | grep -B1 -e "$WSL_DISTRO_NAME$" | head -n1 )
+		if "$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v Flags </dev/null &>/dev/null; then
+			wslu_distro_version=$("$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v Flags </dev/null | tail -n 2 | head -n 1 | sed -e 's|\r||g')
 			wslu_distro_version=${wslu_distro_version##* }
 			wslu_distro_version_processed=$(( "$(printf "%d\n" "$wslu_distro_version")" / 8 ))
 			if [ "$wslu_distro_version_processed" == "1" ]; then
@@ -291,7 +292,7 @@ function wslu_get_wsl_ver {
 }
 
 function chcp_com {
-	"$(windows_system32)"/chcp.com "$@" >/dev/null
+	"$(windows_system32)"/chcp.com "$@" </dev/null >/dev/null
 }
 
 function winps_exec {
@@ -300,12 +301,12 @@ function winps_exec {
 		wslutmpbuild="$(wslu_get_build)"
 		cp="$(cat "${wslu_state_dir}"/oemcp)"
 		[ "$wslutmpbuild" -ge $BN_OCT_NINETEEN ] || chcp_com "$cp"
-		"$(windows_system32)"/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::GetEncoding($cp); $*"
+		"$(windows_system32)"/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::GetEncoding($cp); $*" </dev/null
 		EXIT_STATUS=$?
 		[ "$wslutmpbuild" -ge $BN_OCT_NINETEEN ] || chcp_com 65001
 		return $EXIT_STATUS
 	else
-		"$(windows_system32)"/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$*"
+		"$(windows_system32)"/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$*" </dev/null
 		EXIT_STATUS=$?
 		return $EXIT_STATUS
 	fi
@@ -313,7 +314,7 @@ function winps_exec {
 
 function cmd_exec {
 	debug_echo "cmd_exec: called with command $*"
-	"$(windows_system32)"/cmd.exe /c "$@"
+	"$(windows_system32)"/cmd.exe /c "$@" </dev/null
 	EXIT_STATUS=$?
 	return $EXIT_STATUS
 }
@@ -325,9 +326,9 @@ function baseexec_gen {
 	if [ $wslutmpbuild -ge $BN_MAY_NINETEEN ]; then
 		# The environment variable only available in 19H1 or later.
 		debug_echo "baseexec_gen: 19H1 or higher"
-		wslu_distro_regpath=$("$(windows_system32)"/reg.exe query "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss" /s /f DistributionName 2>&1 | sed -e 's|\r||g' | grep -B1 -e "$WSL_DISTRO_NAME$" | head -n1 )
-		if "$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v PackageFamilyName &>/dev/null; then
-			wslu_distro_packagename=$("$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v PackageFamilyName | tail -n 2 | head -n 1 | sed -e 's|\r||g')
+		wslu_distro_regpath=$("$(windows_system32)"/reg.exe query "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss" /s /f DistributionName </dev/null 2>&1 | sed -e 's|\r||g' | grep -B1 -e "$WSL_DISTRO_NAME$" | head -n1 )
+		if "$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v PackageFamilyName </dev/null &>/dev/null; then
+			wslu_distro_packagename=$("$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v PackageFamilyName </dev/null | tail -n 2 | head -n 1 | sed -e 's|\r||g')
 			# if it is a store distro
 			debug_echo "baseexec_gen: store distro: $wslu_distro_packagename"
 			wslu_distro_packagename=${wslu_distro_packagename##* }
@@ -360,7 +361,7 @@ function var_gen {
 	rm -f "${wslu_state_dir}"/oemcp
 
 	# generate oem codepage
-	"$(windows_system32)"/reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage" /v OEMCP 2>&1 | sed -n 3p | sed -e 's|\r||g' | grep -o '[[:digit:]]*' > "${wslu_state_dir}"/oemcp
+	"$(windows_system32)"/reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage" /v OEMCP </dev/null 2>&1 | sed -n 3p | sed -e 's|\r||g' | grep -o '[[:digit:]]*' > "${wslu_state_dir}"/oemcp
 	# generate base exe location
 	baseexec_gen
 
@@ -375,7 +376,7 @@ function wslu_function_check {
 
 function wslu_file_check {
 	local destination="$1/$2"
-	local source="/usr/share/wslu/$2"
+	local source="${wslu_dest_dir}${wslu_prefix}/share/wslu/$2"
 	local should_i_show=""
 	local refresh=0
 	debug_echo "wslu_file_check: called with $*"
@@ -455,12 +456,12 @@ fi
 #    ${wslu_state_dir}/triggered time
 # 2. if update_time is also not present, i.e.,
 #    badly installed packages or installed via install script
-if [ ! -f "${wslu_state_dir}"/triggered_time ] || [ ! -f /usr/share/wslu/updated_time ]; then
+if [ ! -f "${wslu_state_dir}"/triggered_time ] || [ ! -f "${wslu_dest_dir}${wslu_prefix}/share/wslu/updated_time" ]; then
 	debug_echo "first run or update_time not present; calling var_gen"
 	var_gen
 # This gets triggered when:
 #    installed time is larger than the last triggered time
-elif [ "$(cat "${wslu_state_dir}"/triggered_time)" -lt "$(cat /usr/share/wslu/updated_time)" ]; then
+elif [ "$(cat "${wslu_state_dir}"/triggered_time)" -lt "$(cat "${wslu_dest_dir}${wslu_prefix}/share/wslu/updated_time")" ]; then
 	debug_echo "upgraded package; calling var_gen"
 	var_gen
 fi

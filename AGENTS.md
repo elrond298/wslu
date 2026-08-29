@@ -5,7 +5,7 @@
 - This is a Bash project for Windows Subsystem for Linux (WSL). The README marks it as discontinued, and `.github/PULL_REQUEST_TEMPLATE.md` says breaking changes are no longer accepted.
 - Edit utility implementations in `src/<utility>.sh`. `src/wslu-header` provides the shared runtime, variables, and functions; `make` prepends it to every utility and writes executables to `out/`.
 - Shared installed resources live in `src/etc/`. `src/etc/conf` is the packaged default configuration; `src/etc/user/conf` is the user override template.
-- Bats tests are paired by utility in `tests/<utility>.bats`. Manpage sources are `docs/<utility>.1` and `docs/wslu.7`.
+- Bats tests are split by effect: hermetic tests in `tests/fast/`, automated Windows/WSL tests in `tests/integration/`, and explicitly disruptive tests in `tests/manual/`. Shared fakes and helpers live directly under `tests/`. Manpage sources are `docs/<utility>.1` and `docs/wslu.7`.
 - Packaging definitions and helper scripts are under `extras/build/`; packaging CI also relies on external builder repositories. Do not treat packaging as part of the normal local verification path.
 
 ## Generated files and hazardous commands
@@ -22,20 +22,22 @@ Prerequisites for the normal checks are Bash, GNU Make, gzip, ShellCheck, and Ba
 ```bash
 make shellcheck             # repository lint command; uses .shellcheckrc
 make                        # builds out/* and compressed manpages in out-docs/
-make test                   # bats -r tests
+make test                   # hermetic tests; safe on ordinary Linux or WSL
 ```
 
 There is no repository formatter or type-checker task. Do not invent one.
 
-Use the smallest relevant Bats file after building:
+Use the smallest relevant fast Bats file after building:
 
 ```bash
 make
-bats tests/wslact.bats      # replace wslact with the changed utility
-bats tests/header.bats      # focused shared-header checks
+bats tests/fast/wslact.bats
+bats tests/fast/header.bats
 ```
 
-Most utility tests execute `out/<utility>`, so `make` is required first. The complete CI test environment is a Debian WSL distribution on a Windows host; CI installs the built files before `make test`. Tests for Windows integration are not hermetic: `wslusc` creates Windows Desktop shortcuts, and `wslview` opens files, folders, or URLs. Run those tests only in a suitable disposable WSL environment. CI additionally installs `desktop-file-utils` and `x11-apps`.
+`make test-integration` runs bounded, non-interactive tests against real PowerShell, CMD, registry, `wslpath`, clipboard, and temporary shortcut files. Run it in Windows-hosted WSL; tests must clean their artifacts and must not open applications or write the real Desktop.
+
+`make test-manual` is guarded by `WSLU_RUN_MANUAL_TESTS=1` and may open Windows applications, write Desktop shortcuts, request UAC, change time, mount drives, or drop caches. Run it only in an explicitly disposable environment.
 
 ## Change rules
 
@@ -49,6 +51,6 @@ Most utility tests execute `out/<utility>`, so `make` is required first. The com
 
 - The change is non-breaking.
 - `make shellcheck` passes.
-- `make` passes and the smallest relevant Bats file passes.
-- Run `make test` in the Windows-hosted WSL environment when the change affects shared header behavior or Windows interoperability; otherwise state clearly that this environment-dependent suite was not run.
+- `make` and `make test` pass.
+- Run `make test-integration` when the change affects shared header behavior or Windows interoperability; otherwise state clearly that the Windows-hosted suite was not run.
 - Only source, tests, manpage/configuration sources, and other intentional files are changed; generated output and configure-script side effects are absent.

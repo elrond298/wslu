@@ -28,7 +28,11 @@ function get_clipboard {
 }
 
 function set_clipboard {
-	printf %s "$1" | winps_exec_stdin "\$ErrorActionPreference='Stop'; [Console]::InputEncoding=[Text.Encoding]::UTF8; Set-Clipboard -Value ([Console]::In.ReadToEnd())"
+	if [[ -z $1 ]]; then
+		winps_exec "\$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::Clear()"
+	else
+		printf %s "$1" | winps_exec_stdin "\$ErrorActionPreference='Stop'; [Console]::InputEncoding=[Text.Encoding]::UTF8; Set-Clipboard -Value ([Console]::In.ReadToEnd())"
+	fi
 }
 
 while [ "$#" -gt 0 ]; do
