@@ -33,6 +33,6 @@ decode_winps_log() {
 
 make_instrumented_command() {
   local command=$1 overrides=$2 output=$3
-  sed "/^# shellcheck shell=bash$/i $overrides" "out/$command" > "$output"
+  OVERRIDES="$overrides" awk '/^# shellcheck shell=bash$/ { print ENVIRON["OVERRIDES"] } { print }' "out/$command" > "$output"
   chmod +x "$output"
 }
