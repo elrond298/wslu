@@ -167,14 +167,15 @@ if [[ "$wa_gs_commd" != "" ]] || [[ $isWakeup -eq 1 ]]; then
 	debug_echo "tmp_rand: $tmp_rand"
 
 	action_argument=$(winps_string "\"$script_location_win\\runHidden.vbs\" $wa_gs_commd")
+	windows_system32_win=$(wslpath -w "$(windows_system32)")
 	task_description=$(winps_string "$wa_gs_dscp")
 	task_name=$(winps_string "WSLUtilities_Actions_Startup_${wa_gs_name}_${tmp_rand}")
 
 	# shellcheck disable=SC2028
 	task_script=$(cat << EOF
 \$ErrorActionPreference = 'Stop';
-Import-Module 'C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1';
-\$action = New-ScheduledTaskAction -Execute 'C:\\Windows\\System32\\wscript.exe' -Argument $action_argument;
+Import-Module '$windows_system32_win\\WindowsPowerShell\\v1.0\\Modules\\Microsoft.PowerShell.Utility\\Microsoft.PowerShell.Utility.psd1';
+\$action = New-ScheduledTaskAction -Execute '$windows_system32_win\\wscript.exe' -Argument $action_argument;
 \$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries;
 \$trigger = New-ScheduledTaskTrigger -AtLogOn -User \$env:userdomain\\\$env:username; \$trigger.Delay = 'PT2M';
 \$task = New-ScheduledTask -Action \$action -Trigger \$trigger -Description $task_description -Settings \$settings;

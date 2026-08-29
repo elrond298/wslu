@@ -341,13 +341,14 @@ if [[ "$cname_header" != "" ]]; then
 	fi
 
 	if [[ "$is_gui" == "1" ]]; then
+		windows_system32_win=$(wslpath -w "$(windows_system32)")
 		if [[ "$WSLUSC_GUITYPE" == "legacy" ]]; then
-			if ! winps_exec "\$ErrorActionPreference='Stop'; \$s=(New-Object -COM WScript.Shell).CreateShortcut($(winps_string "$tpath\\$new_cname.lnk")); \$s.TargetPath=$(winps_string 'C:\Windows\System32\wscript.exe'); \$s.Arguments=$(winps_string "\"$script_location_win\\runHidden.vbs\" \"$distro_location_win\" $distro_param \"/usr/share/wslu/wslusc-helper.sh\" \"$windows_shell_command\""); \$s.IconLocation=$(winps_string "$iconpath"); \$s.Save();"; then
+			if ! winps_exec "\$ErrorActionPreference='Stop'; \$s=(New-Object -COM WScript.Shell).CreateShortcut($(winps_string "$tpath\\$new_cname.lnk")); \$s.TargetPath=$(winps_string "$windows_system32_win\\wscript.exe"); \$s.Arguments=$(winps_string "\"$script_location_win\\runHidden.vbs\" \"$distro_location_win\" $distro_param \"/usr/share/wslu/wslusc-helper.sh\" \"$windows_shell_command\""); \$s.IconLocation=$(winps_string "$iconpath"); \$s.Save();"; then
 				error_echo "Failed to create Windows shortcut." 1
 				exit 1
 			fi
 		elif [[ "$WSLUSC_GUITYPE" == "native" ]]; then
-			if ! winps_exec "\$ErrorActionPreference='Stop'; \$s=(New-Object -COM WScript.Shell).CreateShortcut($(winps_string "$tpath\\$new_cname.lnk")); \$s.TargetPath=$(winps_string 'C:\Windows\System32\wslg.exe'); \$s.Arguments=$(winps_string "~ -d \"$WSL_DISTRO_NAME\" bash -l -c \"$windows_shell_command\""); \$s.IconLocation=$(winps_string "$iconpath"); \$s.Save();"; then
+			if ! winps_exec "\$ErrorActionPreference='Stop'; \$s=(New-Object -COM WScript.Shell).CreateShortcut($(winps_string "$tpath\\$new_cname.lnk")); \$s.TargetPath=$(winps_string "$windows_system32_win\\wslg.exe"); \$s.Arguments=$(winps_string "~ -d \"$WSL_DISTRO_NAME\" bash -l -c \"$windows_shell_command\""); \$s.IconLocation=$(winps_string "$iconpath"); \$s.Save();"; then
 				error_echo "Failed to create native Windows shortcut." 1
 				exit 1
 			fi

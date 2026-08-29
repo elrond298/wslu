@@ -44,7 +44,7 @@ Examples:
 ## Windows 10 information
 function get_branch() {
 	debug_echo "get_branch: called"
-	branch=$("$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion" /v BuildBranch | tail -n 2 | head -n 1 | sed -e 's|\r||g') || return 1
+	branch=$("$(windows_system32)"/reg.exe query "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion" /v BuildBranch | tail -n 2 | head -n 1 | sed -e 's|\r||g') || return 1
 	[ -n "$branch" ] || return 1
 	echo "${branch##* }"
 }
@@ -58,14 +58,14 @@ function get_build() {
 
 function get_full_build() {
 	debug_echo "get_full_build: called"
-	full_build=$("$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion" /v BuildLabEx | tail -n 2 | head -n 1 | sed -e 's|\r||g') || return 1
+	full_build=$("$(windows_system32)"/reg.exe query "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion" /v BuildLabEx | tail -n 2 | head -n 1 | sed -e 's|\r||g') || return 1
 	[ -n "$full_build" ] || return 1
 	echo "${full_build##* }"
 }
 
 function get_install_date() {
 	debug_echo "get_install_date: called"
-	installdate=$("$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion" /v InstallDate | tail -n 2 | head -n 1 | sed -e 's|\r||g') || return 1
+	installdate=$("$(windows_system32)"/reg.exe query "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion" /v InstallDate | tail -n 2 | head -n 1 | sed -e 's|\r||g') || return 1
 	[ -n "$installdate" ] || return 1
 	installdate="${installdate##* }"
 	[[ "$installdate" =~ ^(0x[0-9A-Fa-f]+|[0-9]+)$ ]] || return 1
@@ -74,7 +74,7 @@ function get_install_date() {
 
 function get_theme() {
 	debug_echo "get_theme: called"
-	win_theme=$("$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize" /v AppsUseLightTheme | tail -n 2 | head -n 1 | sed -e 's|\r||g') || return 1
+	win_theme=$("$(windows_system32)"/reg.exe query "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize" /v AppsUseLightTheme | tail -n 2 | head -n 1 | sed -e 's|\r||g') || return 1
 	[ -n "$win_theme" ] || return 1
 	win_theme=${win_theme##* }
 	case "$win_theme" in
@@ -152,7 +152,7 @@ function get_wsl_packages() {
 	debug_echo "get_wsl_packages: called"
 	case "$distro" in
 		'pengwin'|'ubuntu'|'kali'|'debian'|'wlinux')
-			packages=$(dpkg -l | grep -c '^i') || return 1;;
+			packages=$(dpkg -l | grep -c '^ii[[:space:]]') || return 1;;
 		'opensuse'|'sles'|'scilinux'|'oldfedora'|'fedora'|'fedoraremix'|'almalinux'|'oracle'|'cblm'|'clear')
 			packages=$(rpm -qa | wc -l) || return 1;;
 		'alpine')

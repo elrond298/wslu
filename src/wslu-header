@@ -199,7 +199,7 @@ function winps_string {
 
 function winps_exec_stdin {
 	debug_echo "winps_exec_stdin: called"
-	"$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$1"
+	"$(windows_system32)"/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$1"
 }
 
 function help {
@@ -255,8 +255,16 @@ function sysdrive_prefix {
 	unset hard_reset
 }
 
+function windows_system32 {
+	if [ "${WSLU_WINDOWS_SYSTEM32+x}" ]; then
+		printf '%s\n' "$WSLU_WINDOWS_SYSTEM32"
+	else
+		printf '%s\n' "$(interop_prefix)$(sysdrive_prefix)/Windows/System32"
+	fi
+}
+
 function wslu_get_build {
-	build=$("$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion" /v CurrentBuild | tail -n 2 | head -n 1 | sed -e 's|\r||g')
+	build=$("$(windows_system32)"/reg.exe query "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion" /v CurrentBuild | tail -n 2 | head -n 1 | sed -e 's|\r||g')
 	echo "${build##* }"
 }
 
@@ -264,9 +272,9 @@ function wslu_get_wsl_ver {
 	wslutmpbuild="$(( $(wslu_get_build) + 0 ))"
 	if [ $wslutmpbuild -ge $BN_MAY_NINETEEN ]; then
 		# The environment variable only available in 19H1 or later.
-		wslu_distro_regpath=$("$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss" /s /f DistributionName 2>&1 | sed -e 's|\r||g' | grep -B1 -e "$WSL_DISTRO_NAME$" | head -n1 )
-		if "$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "$wslu_distro_regpath" /v Flags &>/dev/null; then
-			wslu_distro_version=$("$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "$wslu_distro_regpath" /v Flags | tail -n 2 | head -n 1 | sed -e 's|\r||g')
+		wslu_distro_regpath=$("$(windows_system32)"/reg.exe query "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss" /s /f DistributionName 2>&1 | sed -e 's|\r||g' | grep -B1 -e "$WSL_DISTRO_NAME$" | head -n1 )
+		if "$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v Flags &>/dev/null; then
+			wslu_distro_version=$("$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v Flags | tail -n 2 | head -n 1 | sed -e 's|\r||g')
 			wslu_distro_version=${wslu_distro_version##* }
 			wslu_distro_version_processed=$(( "$(printf "%d\n" "$wslu_distro_version")" / 8 ))
 			if [ "$wslu_distro_version_processed" == "1" ]; then
@@ -283,7 +291,7 @@ function wslu_get_wsl_ver {
 }
 
 function chcp_com {
-	"$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/chcp.com "$@" >/dev/null
+	"$(windows_system32)"/chcp.com "$@" >/dev/null
 }
 
 function winps_exec {
@@ -292,12 +300,12 @@ function winps_exec {
 		wslutmpbuild="$(wslu_get_build)"
 		cp="$(cat "${wslu_state_dir}"/oemcp)"
 		[ "$wslutmpbuild" -ge $BN_OCT_NINETEEN ] || chcp_com "$cp"
-		"$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::GetEncoding($cp); $*"
+		"$(windows_system32)"/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::GetEncoding($cp); $*"
 		EXIT_STATUS=$?
 		[ "$wslutmpbuild" -ge $BN_OCT_NINETEEN ] || chcp_com 65001
 		return $EXIT_STATUS
 	else
-		"$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$*"
+		"$(windows_system32)"/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$*"
 		EXIT_STATUS=$?
 		return $EXIT_STATUS
 	fi
@@ -305,7 +313,7 @@ function winps_exec {
 
 function cmd_exec {
 	debug_echo "cmd_exec: called with command $*"
-	"$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/cmd.exe /c "$@"
+	"$(windows_system32)"/cmd.exe /c "$@"
 	EXIT_STATUS=$?
 	return $EXIT_STATUS
 }
@@ -317,9 +325,9 @@ function baseexec_gen {
 	if [ $wslutmpbuild -ge $BN_MAY_NINETEEN ]; then
 		# The environment variable only available in 19H1 or later.
 		debug_echo "baseexec_gen: 19H1 or higher"
-		wslu_distro_regpath=$("$(interop_prefix)"c/Windows/System32/reg.exe query "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss" /s /f DistributionName 2>&1 | sed -e 's|\r||g' | grep -B1 -e "$WSL_DISTRO_NAME$" | head -n1 )
-		if "$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "$wslu_distro_regpath" /v PackageFamilyName &>/dev/null; then
-			wslu_distro_packagename=$("$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "$wslu_distro_regpath" /v PackageFamilyName | tail -n 2 | head -n 1 | sed -e 's|\r||g')
+		wslu_distro_regpath=$("$(windows_system32)"/reg.exe query "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss" /s /f DistributionName 2>&1 | sed -e 's|\r||g' | grep -B1 -e "$WSL_DISTRO_NAME$" | head -n1 )
+		if "$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v PackageFamilyName &>/dev/null; then
+			wslu_distro_packagename=$("$(windows_system32)"/reg.exe query "$wslu_distro_regpath" /v PackageFamilyName | tail -n 2 | head -n 1 | sed -e 's|\r||g')
 			# if it is a store distro
 			debug_echo "baseexec_gen: store distro: $wslu_distro_packagename"
 			wslu_distro_packagename=${wslu_distro_packagename##* }
@@ -330,17 +338,17 @@ function baseexec_gen {
 				wslpath -w "$(find "$wslu_base_exec_folder_path" -name "*.exe" -print -quit)" > "${wslu_state_dir}"/baseexec
 			else
 				debug_echo "baseexec_gen: do not have base exec in the folder; use fallback"
-				echo "$(wslpath -w "$(interop_prefix)$(sysdrive_prefix)")\\Windows\\System32\\wsl.exe" > "${wslu_state_dir}"/baseexec
+				echo "$(wslpath -w "$(windows_system32)")\\wsl.exe" > "${wslu_state_dir}"/baseexec
 			fi
 		else
 			debug_echo "baseexec_gen: imported distro"
 			# if it is imported distro
-			echo "$(wslpath -w "$(interop_prefix)$(sysdrive_prefix)")Windows\\System32\\wsl.exe" > "${wslu_state_dir}"/baseexec
+			echo "$(wslpath -w "$(windows_system32)")\\wsl.exe" > "${wslu_state_dir}"/baseexec
 		fi
 	else
 		debug_echo "baseexec_gen: fallback mode"
 		# older version fallback.
-		echo "$(wslpath -w "$(interop_prefix)$(sysdrive_prefix)")\\Windows\\System32\\wsl.exe" > "${wslu_state_dir}"/baseexec
+		echo "$(wslpath -w "$(windows_system32)")\\wsl.exe" > "${wslu_state_dir}"/baseexec
 	fi
 }
 
@@ -352,7 +360,7 @@ function var_gen {
 	rm -f "${wslu_state_dir}"/oemcp
 
 	# generate oem codepage
-	"$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage" /v OEMCP 2>&1 | sed -n 3p | sed -e 's|\r||g' | grep -o '[[:digit:]]*' > "${wslu_state_dir}"/oemcp
+	"$(windows_system32)"/reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage" /v OEMCP 2>&1 | sed -n 3p | sed -e 's|\r||g' | grep -o '[[:digit:]]*' > "${wslu_state_dir}"/oemcp
 	# generate base exe location
 	baseexec_gen
 

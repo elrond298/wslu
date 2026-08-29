@@ -94,7 +94,7 @@ Example:
 	fi
 
 	#shellcheck disable=SC1003
-	if ! drive_list=$(set -o pipefail; "$mntpt_prefix$sysdrv_prefix"/WINDOWS/system32/fsutil.exe fsinfo drives | tail -1 | tr '[:upper:]' '[:lower:]' | tr -d ':\\' | sed -e 's/drives //g' -e "s|$sysdrv_prefix ||g" -e 's|\r||g' -e 's| $||g' -e 's| |\n|g'); then
+	if ! drive_list=$(set -o pipefail; "$(windows_system32)"/fsutil.exe fsinfo drives | tail -1 | tr '[:upper:]' '[:lower:]' | tr -d ':\\' | sed -e 's/drives //g' -e "s|$sysdrv_prefix ||g" -e 's|\r||g' -e 's| $||g' -e 's| |\n|g'); then
 		error_echo "Failed to enumerate Windows drives." 1
 	fi
 
@@ -117,7 +117,7 @@ Example:
 		if [[ ! -d "$mntpt_prefix$drive" ]] && ! mkdir -p "$mntpt_prefix$drive"; then
 			error_echo "Failed to create mount point: $mntpt_prefix$drive" 1
 		fi
-		if [[ -n $(find "$mntpt_prefix$drive" -maxdepth 0 -type d -empty 2>/dev/null) ]]; then
+		if ! mountpoint -q -- "$mntpt_prefix$drive"; then
 			echo "${info} Mounting Drive ${drive^} to $mntpt_prefix$drive..."
 			if mount -t drvfs "${drive}:" "$mntpt_prefix$drive" -o "$mount_opt" 2>/dev/null; then
 				echo "${info} Mounted Drive ${drive^} to $mntpt_prefix$drive."
