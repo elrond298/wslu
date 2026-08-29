@@ -10,15 +10,17 @@
 @test "wslsys - Help" {
   run out/wslsys --help
   [ "${lines[0]}" = "wslsys - Part of wslu, a collection of utilities for Windows Subsystem for Linux (WSL)" ]
-  [[ "${lines[1]}" =~ ^Usage\:\ .*wslsys\ \[\-VIbBFUWRKPSltTd\]\ \[\-s\]$ ]]
-  [[ "${lines[2]}" =~ ^.*wslsys\ \[\-hv\]\ \[\-n\ NAME\]$ ]]
+  [[ "${lines[1]}" =~ ^Usage\:\ .*wslsys\ \[FIELD\]\ \[\-s\]$ ]]
+  [[ "${lines[2]}" =~ ^.*wslsys\ \-n\ NAME\ \[\-s\]$ ]]
+  [[ "${lines[3]}" =~ ^.*wslsys\ \[\-hv\]$ ]]
 }
 
 @test "wslsys - Help - Alt." {
   run out/wslsys -h
   [ "${lines[0]}" = "wslsys - Part of wslu, a collection of utilities for Windows Subsystem for Linux (WSL)" ]
-  [[ "${lines[1]}" =~ ^Usage\:\ .*wslsys\ \[\-VIbBFUWRKPSltTd\]\ \[\-s\]$ ]]
-  [[ "${lines[2]}" =~ ^.*wslsys\ \[\-hv\]\ \[\-n\ NAME\]$ ]]
+  [[ "${lines[1]}" =~ ^Usage\:\ .*wslsys\ \[FIELD\]\ \[\-s\]$ ]]
+  [[ "${lines[2]}" =~ ^.*wslsys\ \-n\ NAME\ \[\-s\]$ ]]
+  [[ "${lines[3]}" =~ ^.*wslsys\ \[\-hv\]$ ]]
 }
 
 @test "wslsys - /w parameter" {

@@ -2,15 +2,18 @@
 .SH NAME
 .B wslsys
 - Component of WSL Utilities
-.SH SYNOSIS
+.SH SYNOPSIS
 .B wslsys
-.RB [ \-VIbBFUWRKPSltT ]
+.RI [ FIELD ]
+.RB [ \-s ]
+.PP
+.B wslsys
+.B \-n
+.I NAME
 .RB [ \-s ]
 .PP
 .B wslsys
 .RB [ \-hv ]
-.RB [ \-n 
-.IR NAME ]
 .SH DESCRIPTION
 This is a WSL system information printer to print out some basic system
 information.
@@ -33,8 +36,7 @@ Print the the WSL version your current distribution is using.
 For example, \fB"1"\fR for using WSL 1st generation.
 .TP
 .B -I, --sys-installdate
-Print the time when the current release is installed. The format is in Hex Unix Timestamp.
-For example, \fB"0x5df84068"\fR.
+Print the formatted Windows installation date. With \fB-s\fR, print the raw hexadecimal Unix timestamp, for example \fB"0x5df84068"\fR.
 .TP
 .B -b, --branch
 Print current release branch of your Windows 10.
@@ -78,7 +80,7 @@ For example, \fB"2"\fR for 200% scaling.
 .TP
 .B -l, --locale
 Print the Windows locale information.
-For example, \fB"en-US"\fR for English (United States).
+For example, \fB"en_US"\fR for English (United States).
 .TP
 .B -t, --win-theme
 Print the Windows Theme.

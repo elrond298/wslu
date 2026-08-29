@@ -44,12 +44,6 @@ bash_version_full=$(bash --version | head -n 1)
 bash_version_major=$(echo "$bash_version_full" | cut -d ' ' -f 4 | cut -d '.' -f 1)
 bash_version_minor=$(echo "$bash_version_full" | cut -d ' ' -f 4 | cut -d '.' -f 2)
 
-# pipeline content to pipe... if it is wslclip
-if [[ "$wslu_util_name" == "wslclip" ]]; then
-	if [[ -p /dev/stdin ]]; then
-		PIPE=$(cat -)
-	fi
-fi
 
 # conf handling module
 __wsl_conf_read() {
@@ -197,13 +191,24 @@ fi
 
 # functions
 
-function help {
-	app_name=$wslu_util_name
-	echo -e "$app_name - Part of wslu, a collection of utilities for Windows Subsystem for Linux (WSL)
-Usage: $2
+function winps_string {
+	local encoded
+	encoded=$(printf %s "$1" | base64 | tr -d '\n')
+	printf "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'))" "$encoded"
+}
 
-For more help for $app_name, please use the command \`man $app_name\` or visit the following site: https://wslutiliti.es/wslu/man/$app_name.html.
-For overall help, you can use the command \`man wslu\` or visite the following site: https://wslutiliti.es/wslu."
+function winps_exec_stdin {
+	debug_echo "winps_exec_stdin: called"
+	"$(interop_prefix)$(sysdrive_prefix)"/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$1"
+}
+
+function help {
+ app_name=$wslu_util_name
+ echo -e "$app_name - Part of wslu, a collection of utilities for Windows Subsystem for Linux (WSL)
+Usage: $2"
+ if [ -n "${help_details:-}" ]; then
+  printf '\n%s\n' "$help_details"
+ fi
 }
 
 function version {
@@ -361,21 +366,39 @@ function wslu_function_check {
 }
 
 function wslu_file_check {
+	local destination="$1/$2"
+	local source="/usr/share/wslu/$2"
+	local should_i_show=""
+	local refresh=0
 	debug_echo "wslu_file_check: called with $*"
-	should_i_show=""
 	[[ "$3" == "?!S" ]] && should_i_show="n"
+	[[ "$3" == "?!R" ]] && refresh=1
 
-	if [[ ! -f "$1/$2" ]]; then
-		[[ -z "$should_i_show" ]] && echo "${warn} $2 not found in Windows directory. Copying right now..."
-		[[ -d "$1" ]] || mkdir "$1"
-		if [[ -f "/usr/share/wslu/$2" ]]; then
-			cp "/usr/share/wslu/$2" "$1"
-			[[ -z "$should_i_show" ]] && echo "${info} $2 copied. Located at \"$1\"."
-		else
-			[[ -z "$should_i_show" ]] && echo "${error} $2 not found. Failed to copy."
-			exit 30
-		fi
+	if [[ ! -f "$source" ]]; then
+		[[ -z "$should_i_show" ]] && echo "${error} $2 not found. Failed to copy."
+		exit 30
 	fi
+	if [[ -L "$destination" ]] || [[ -d "$destination" ]]; then
+		error_echo "Refusing unsafe resource destination: $destination" 1
+	fi
+	if [[ -f "$destination" ]] && { [[ "$refresh" -eq 0 ]] || cmp -s "$source" "$destination"; }; then
+		return 0
+	fi
+
+	[[ -z "$should_i_show" ]] && echo "${warn} Installing current $2 in Windows directory..."
+	if [[ ! -d "$1" ]] && ! mkdir -p "$1"; then
+		error_echo "Failed to create resource directory: $1" 1
+	fi
+	temporary=$(mktemp "$1/.wslu-$2.XXXXXX") || error_echo "Failed to create temporary resource file." 1
+	if ! cp "$source" "$temporary" || ! chmod --reference="$source" "$temporary"; then
+		rm -f "$temporary"
+		error_echo "Failed to stage $2 in $1." 1
+	fi
+	if ! mv -fT "$temporary" "$destination"; then
+		rm -f "$temporary"
+		error_echo "Failed to install $2 into $1." 1
+	fi
+	[[ -z "$should_i_show" ]] && echo "${info} $2 installed at \"$destination\"."
 }
 
 function wslpy_check {

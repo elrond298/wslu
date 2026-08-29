@@ -26,10 +26,10 @@ add a colorbar to the printed information. This can also be set with the configu
 Force to print information with generic WSL logo.
 .TP
 .B -t, --theme \fITHEME\fR
-set a custom theme from the file \fITHEME\fR. This can also be set with the configuration \fIWSLFETCH_THEME_PATH\fR.
+Source a readable, trusted Bash theme file. The file may override t and ascii_text. Unreadable files and themes that return failure are rejected.
 .TP
 .B -o, --options \fIOPTIONS\fR
-set custom options from the file \fIOPTIONS\fR. Please refer to the WSLFETCH_INFO_SECTION in the CONFIGURATION section for more information.
+Set OPTIONS to a non-empty comma-separated list of field names from WSLFETCH_INFO_SECTION. Unknown or empty field names are rejected.
 .SH CONFIGURATION
 .TP
 .B WSLFETCH_INFO_SECTION
@@ -49,6 +49,8 @@ wsl-release
 wsl-kernel
 wsl-package-count
 wsl-ip
+win-system-type
+wsl-systemd-status
 .in
 .TP
 \'wsl-version\' will be always ignored since it is builtin in wslfetch. The default value is "windows-build,windows-rel-branch,wsl-release,wsl-kernel,windows-uptime".

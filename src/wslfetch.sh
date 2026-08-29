@@ -3,10 +3,55 @@ is_color=0
 is_generic=0
 
 help_short="wslfetch [-hvcg] [-t THEME] [-o OPTIONS]"
+help_details='Display WSL and Windows system information beside a distribution logo.
 
-PARSED_ARGUMENTS=$(getopt -a -n "${wslu_util_name##*/}" -o hvtcgo: --long help,version,theme,colorbar,generic,options: -- "$@")
+Arguments:
+  THEME    Path to a trusted Bash file sourced in the current process. It may
+           override t (the information color) and ascii_text (the Bash array of
+           logo lines); omitted values keep the generic defaults. Because the file
+           executes as shell code, do not use an untrusted theme.
+  OPTIONS  Comma-separated field names:
+             windows-install-date  Windows installation date.
+             windows-rel-branch    Windows release branch.
+             windows-build         Numeric Windows build.
+             windows-full-build    Full Windows build identifier.
+             display-scaling       Windows display scale.
+             windows-locale        Windows locale.
+             windows-theme         Windows light or dark application theme.
+             windows-uptime        Time since Windows started.
+             wsl-uptime            Time since this WSL instance started.
+             wsl-release           Linux distribution name and release.
+             wsl-kernel            Linux kernel version.
+             wsl-package-count     Number of installed Linux packages.
+             wsl-ip                WSL IPv4 address.
+             win-system-type       Windows Desktop, Server, or Domain Controller.
+             wsl-systemd-status    systemd status in WSL.
+           The WSL generation is always shown and need not be listed.
+
+Options:
+  -c, --colorbar          Show a terminal color bar below the information.
+  -g, --generic           Use the generic WSL logo instead of the distro logo.
+  -t, --theme THEME       Use the logo and color defined by THEME.
+  -o, --options OPTIONS   Show only the listed information fields.
+  -h, --help              Show this help.
+  -v, --version           Show the wslu version.
+
+Configuration defaults:
+  WSLFETCH_INFO_SECTION defaults to:
+    windows-build,windows-rel-branch,wsl-release,wsl-kernel,windows-uptime
+  WSLFETCH_COLORBAR=false
+  WSLFETCH_THEME_PATH is empty. Set it to the same trusted file accepted by --theme.
+
+Examples:
+  wslfetch --colorbar
+  wslfetch --options windows-build,wsl-release,wsl-kernel'
+
+PARSED_ARGUMENTS=$(getopt -a -n "${wslu_util_name##*/}" -o hvt:cgo: --long help,version,theme:,colorbar,generic,options: -- "$@")
 #shellcheck disable=SC2181
-[ "$?" != "0" ] && help "$wslu_util_name" "$help_short"
+if [ "$?" != "0" ]; then
+	help "$wslu_util_name" "$help_short"
+	exit 22
+fi
 
 eval set -- "$PARSED_ARGUMENTS"
 while :
@@ -14,11 +59,29 @@ do
 	case "$1" in
 		-h|--help) help "$_tmp_cmdname" "$help_short"; exit;;
 		-v|--version) version; exit;;
-		-t|--theme) shift; WSLFETCH_THEME_PATH="$1"; shift;;
+		-t|--theme)
+			if [ -z "$2" ] || [[ "$2" == -* ]]; then
+				error_echo "$1 requires THEME." 22
+				exit 22
+			fi
+			WSLFETCH_THEME_PATH="$2"
+			shift 2;;
 		-c|--colorbar) is_color=1; shift;;
 		-g|--generic) is_generic=1; shift;;
-		-o|--options) shift; WSLFETCH_INFO_SECTION="$1"; shift;;
-		--) shift; break ;;
+		-o|--options)
+			if [ -z "$2" ] || [[ "$2" == -* ]]; then
+				error_echo "$1 requires OPTIONS." 22
+				exit 22
+			fi
+			WSLFETCH_INFO_SECTION="$2"
+			shift 2;;
+		--)
+			shift
+			if [ "$#" -gt 0 ]; then
+				error_echo "Unexpected argument: $1" 22
+				exit 22
+			fi
+			break;;
 		*) echo "Unexpected option: $1"
 			help "$_tmp_cmdname" "$help_short"
 			exit 1;;
@@ -30,6 +93,24 @@ debug_echo "is_generic: $is_generic"
 debug_echo "WSLFETCH_INFO_SECTION: $WSLFETCH_INFO_SECTION"
 debug_echo "WSLFETCH_COLORBAR: $WSLFETCH_COLORBAR"
 debug_echo "WSLFETCH_ASCII_PATH: $WSLFETCH_ASCII_PATH"
+
+if [ -n "$WSLFETCH_THEME_PATH" ] && [ ! -r "$WSLFETCH_THEME_PATH" ]; then
+	error_echo "Theme is not readable: $WSLFETCH_THEME_PATH" 22
+	exit 22
+fi
+
+if [ -z "$WSLFETCH_INFO_SECTION" ] || [[ "$WSLFETCH_INFO_SECTION" == ,* ]] || [[ "$WSLFETCH_INFO_SECTION" == *, ]] || [[ "$WSLFETCH_INFO_SECTION" == *,,* ]]; then
+	error_echo "Information fields must be a non-empty comma-separated list." 22
+	exit 22
+fi
+
+IFS=',' read -r -a requested_fields <<< "$WSLFETCH_INFO_SECTION"
+for field in "${requested_fields[@]}"; do
+	case "$field" in
+		windows-install-date|windows-rel-branch|windows-build|windows-full-build|display-scaling|windows-locale|windows-theme|windows-uptime|wsl-version|wsl-uptime|wsl-release|wsl-kernel|wsl-package-count|wsl-ip|win-system-type|wsl-systemd-status) ;;
+		*) error_echo "Unknown information field: ${field:-<empty>}" 22; exit 22;;
+	esac
+done
 
 if [[ "$is_generic" == "1" ]] || [[ -n "$WSLFETCH_THEME_PATH" ]]; then
 	distro=""
@@ -400,7 +481,10 @@ esac
 if [[ -n "$WSLFETCH_THEME_PATH" ]]; then
 	debug_echo "custom theme detected: $WSLFETCH_THEME_PATH"
 	#shellcheck disable=SC1090
-	source "$WSLFETCH_THEME_PATH"
+	if ! source "$WSLFETCH_THEME_PATH"; then
+		error_echo "Failed to load theme: $WSLFETCH_THEME_PATH" 22
+		exit 22
+	fi
 fi
 
 debug_echo "distro: $distro"
@@ -409,9 +493,15 @@ debug_echo "ascii_text: ${ascii_text[*]}"
 
 SAVEIFS=$IFS
 info_collect=()
+wslsys_command=(wslsys)
+[ -n "$wslu_debug" ] && wslsys_command+=("$wslu_debug")
+if ! wslsys_output=$("${wslsys_command[@]}" --wslfetch "${WSLFETCH_INFO_SECTION}" "${t}"); then
+	error_echo "Failed to collect system information." 1
+	exit 1
+fi
 while IFS=$'\n' read -r line; do
-	info_collect+=("$line");
-done < <(wslsys "$wslu_debug" --wslfetch "${WSLFETCH_INFO_SECTION}" "${t}")
+	info_collect+=("$line")
+done <<< "$wslsys_output"
 IFS=$SAVEIFS
 
 wslf_ver="${info_collect[0]}"
