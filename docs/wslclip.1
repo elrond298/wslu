@@ -1,15 +1,13 @@
 .TH "WSLCLIP" "1" "DATEPLACEHOLDER" "VERSIONPLACEHOLDER" "WSL Utilities User Manual"
 .SH NAME
-.B wslgsu
+.B wslclip
 - Component of WSL Utilities
-.SH SYNOSIS
+.SH SYNOPSIS
 .B wslclip
-.RB [ \-hvg ]
-.PP
-.B wslclip
-.I CONTENT
+.RB [ OPTIONS ]
+.RI [ CONTENT ...]
 .SH DESCRIPTION
-This tool allows you to get or set clipboard content on Windows without X/wayland support.
+Get or set Windows clipboard content without X or Wayland. CONTENT and all remaining words set the clipboard; piped standard input is used when CONTENT is absent. No input clears the clipboard. Options are parsed only before CONTENT; use \fB--\fR before content beginning with a dash.
 .SH OPTIONS
 .TP
 .B -h, --help
@@ -19,7 +17,7 @@ Print a simple help.
 Print current version.
 .TP
 .B -g, --get
-Get clipboard content from Windows.
+Print Windows clipboard content. This option cannot be combined with CONTENT.
 .SH AUTHOR
 Created by Patrick Wu <me@patrickwu.space>
 .SH REPORTING BUGS

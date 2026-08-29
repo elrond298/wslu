@@ -7,9 +7,9 @@
 .RB COMMAND
 .I ...
 .SH DESCRIPTION
-A set of quick actions for WSL such as creating startup tasks and manually sync time between Windows and WSL.
+Maintenance actions for WSL: synchronize time with Windows, mount Windows drives, and reclaim the Linux page cache.
 .PP
-Currently, we have two features available:
+Three actions are available:
 .in +4n
 .nf
 \fBts, time-sync\fR \- Time Sync
@@ -37,11 +37,13 @@ Auto Mounting (\fIauto-mount\fR) feature allows you to mount all drives availabl
 .TP
 SYNOPSIS
 .B wslact auto-mount
-.RB [ \-mh ]
+.RB [ \-m
+.IR OPTIONS ]
+.RB [ \-h ]
 .TP
 OPTIONS
 .nf
-.B -m, --mount-options
+.B -m, --mount-options \fIOPTIONS\fR
 .in +4n
 pass a list of options you want to pass to \fImount\fR command.
 .in

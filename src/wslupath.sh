@@ -7,7 +7,45 @@ style=1
 reg_path=0
 set_path=""
 
-help_short="wslupath [-dOr] [-D|-A|-T|-S|-W|-s|-su|-H|-P|...NAME...]\nwslupath [-h|-v|-R]"
+help_short="wslupath [-dO] PATH\nwslupath -r [-dO] SHELL_FOLDER\nwslupath [-dO] LOCATION\nwslupath [-h|-v|-R]"
+help_details='Convert between Windows and WSL path forms. This command is deprecated;
+use wslpath for ordinary path conversion.
+
+Arguments:
+  PATH          A Windows path such as C:\Windows or a mounted WSL path such
+                as /mnt/c/Windows. Output defaults to the opposite path form.
+  SHELL_FOLDER  Windows shell-folder registry name, such as Desktop or Startup.
+                Use --avail-reg to list names accepted on this Windows account.
+  LOCATION      One of the known-location options below.
+
+Output style:
+  -O, --original          Print input unchanged; known locations stay Windows-style.
+  -d, --doubledash-dir   Double backslashes without converting the path form.
+  -r, --reg-data         Interpret SHELL_FOLDER as a shell-folder registry name.
+
+Known locations:
+  -D, --desktop           Windows Desktop folder.
+  -A, --appdata           Windows roaming AppData folder.
+  -T, --temp              Windows temporary folder.
+  -S, --sysdir            Windows System32 folder.
+  -W, --windir            Windows installation folder.
+  -s, --start-menu        Windows Start Menu folder.
+  -su, --startup          Windows Startup folder.
+  -H, --home              Windows user home folder.
+  -P, --program-files     Windows Program Files folder.
+
+Options:
+  -R, --avail-reg         List shell-folder names accepted by -r.
+  -h, --help              Show this help.
+  -v, --version           Show the wslu version.
+
+Place an output-style option before a known-location option.
+
+Examples:
+  wslupath "C:\Windows"
+  wslupath /mnt/c/Windows
+  wslupath -d -D
+  wslupath -r Desktop'
 
 function path_double_dash {
 	new_path="${*//\\/\\\\}"
