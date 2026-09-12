@@ -30,7 +30,7 @@ print current version.
 Select \fBpowershell\fR, \fBcmd\fR, or \fBcmd_explorer\fR as the Windows launcher.
 .TP
 .B -s, --skip-validation-check
-Skip the curl HTTP HEAD probe. A failed probe normally leaves the original URL unchanged and does not convert it to a filesystem path.
+Accepted for compatibility and ignored. wslview used to send a curl HTTP HEAD probe before opening a URL, but the result never changed the outcome: a URL is opened exactly as given either way, so the probe was removed.
 .TP
 .B --reveal \fIPATH\fR
 Highlight \fIPATH\fR in its Windows Explorer folder instead of opening it. \fIPATH\fR must be an existing Linux path or a Windows path; this option cannot be combined with \fILINK_OR_FILE\fR.
@@ -56,7 +56,10 @@ cmd_explorer: use explorer.exe directly
 .fi
 .TP
 .B WSLVIEW_SKIP_VALIDATION_CHECK
-whether to skip validation check. Default is 1, which is not skipping. Can be either `0` or `1`.
+accepted for compatibility and ignored. It is still validated, so it must be `0` or `1`, but it no longer selects anything.
+.TP
+.B WSLVIEW_USE_HELPER
+whether to launch through the resident helper that ships with wslu. Default is "true". Can be either `true` or `false`. Set to "false" to always launch \fBpowershell.exe\fR directly.
 .SH NOTES
 Opening a file stored in the Linux filesystem launches it through the
 .B \e\ewsl.localhost\e\eDISTRO\e\e
@@ -74,6 +77,34 @@ Use
 instead of
 .B wsl.localhost
 for setups still relying on the legacy share name. Revert by deleting the added registry value.
+.SH HELPER
+wslview normally keeps a small helper process alive on the Windows side. The helper
+holds a
+.B powershell.exe
+socket round trip instead of a whole PowerShell startup. On a typical machine that
+turns a launch from several hundred milliseconds into roughly 150ms.
+.PP
+The helper is started on demand and never delays a launch: when it is not running,
+the current call goes the usual way and a helper is started in the background, so
+only the first launch after it is missing is slow. It exits after two hours without
+a request.
+.PP
+The helper only listens on the Windows loopback interface, which WSL can reach in
+mirrored networking mode. In NAT mode it cannot, so the helper is simply never used
+and wslview keeps launching
+.B powershell.exe
+itself. Whenever the helper cannot be reached for any reason, wslview falls back to
+launching
+.B powershell.exe
+directly, so a broken or missing helper cannot break wslview.
+.PP
+wslview forgets a running helper when
+.B $XDG_STATE_HOME/wslu/wslview-helper.port
+and
+.B $XDG_STATE_HOME/wslu/wslview-helper.token
+are deleted; the process itself exits after two idle hours. Set
+.B WSLVIEW_USE_HELPER
+to "false" to disable the helper entirely.
 .SH AUTHOR
 Created by Patrick Wu <me@patrickwu.space>
 .SH REPORTING BUGS

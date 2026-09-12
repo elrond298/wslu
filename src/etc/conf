@@ -73,5 +73,15 @@ WSLVAR_DEFAULT_VARTYPE=1
 #    cmd_explorer: use explorer.exe directly
 WSLVIEW_DEFAULT_ENGINE="powershell"
 
-# wslview: whether to skip validation check. Default is 1, which is not skipping. Can be either `0` or `1`.
+# wslview: accepted for compatibility and ignored. wslview used to send an HTTP HEAD
+# probe to URLs, which cost several hundred milliseconds and never changed what wslview
+# did: a URL is always opened exactly as given. The value is still checked, so it has to
+# be `0` or `1`, but it no longer selects anything.
 WSLVIEW_SKIP_VALIDATION_CHECK=1
+
+# wslview: whether to launch through the resident helper, share/wslu/wslview-helper.ps1.
+# The helper keeps a powershell.exe and its Shell.Application COM object alive, so a
+# launch costs one loopback socket round trip instead of a PowerShell startup. It is
+# only reachable in WSL mirrored networking mode; otherwise, and whenever the helper
+# is not running, wslview launches powershell.exe itself. Can be `true` or `false`.
+WSLVIEW_USE_HELPER=true

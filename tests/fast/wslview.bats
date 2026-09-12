@@ -96,7 +96,7 @@ setup() {
   target='www.duckduckgo.com'
   run "$BATS_TEST_TMPDIR/wslview" "$target"
   [ "$status" -eq 0 ]
-  assert_called "curl --head --silent --fail -g -- $target"
+  refute_called 'curl'
   refute_called "wslpath -w $target"
   decoded=$(decode_winps_log)
   [[ "$decoded" == *"$target"* ]]
@@ -106,7 +106,7 @@ setup() {
   target='http://info.cern.ch'
   run "$BATS_TEST_TMPDIR/wslview" "$target"
   [ "$status" -eq 0 ]
-  assert_called "curl --head --silent --fail -g -- $target"
+  refute_called 'curl'
   refute_called "wslpath -w $target"
   decoded=$(decode_winps_log)
   [[ "$decoded" == *"$target"* ]]
@@ -116,7 +116,7 @@ setup() {
   target='https://wslutiliti.es/'
   run "$BATS_TEST_TMPDIR/wslview" "$target"
   [ "$status" -eq 0 ]
-  assert_called "curl --head --silent --fail -g -- $target"
+  refute_called 'curl'
   refute_called "wslpath -w $target"
   decoded=$(decode_winps_log)
   [[ "$decoded" == *"$target"* ]]
@@ -126,17 +126,17 @@ setup() {
   target='https://www.duckduckgo.com/?q=[wslu]'
   run "$BATS_TEST_TMPDIR/wslview" "$target"
   [ "$status" -eq 0 ]
-  assert_called "curl --head --silent --fail -g -- $target"
+  refute_called 'curl'
   refute_called "wslpath -w $target"
   decoded=$(decode_winps_log)
   [[ "$decoded" == *"$target"* ]]
 }
 
-@test "wslview preserves URL fragments when validation fails" {
+@test "wslview opens a URL with a fragment without probing the network" {
   target='http://127.0.0.1:9077/#token=ffba2f59377788ee57edb31aeb859f335cb665a4e34fe116f4e8048cce8d0070'
   run "$BATS_TEST_TMPDIR/wslview" "$target"
   [ "$status" -eq 0 ]
-  assert_called "curl --head --silent --fail -g -- $target"
+  refute_called 'curl'
   refute_called "wslpath -w $target"
   assert_called 'Shell.Application'
   assert_called 'ShellExecute('
@@ -144,6 +144,15 @@ setup() {
   decoded=$(decode_winps_log)
   [[ "$decoded" == *"$target"* ]]
   refute_called 'Start ('
+}
+
+@test "wslview still accepts the deprecated validation configuration" {
+  printf '%s\n' 'WSLVIEW_SKIP_VALIDATION_CHECK=0' > "$HOME/.wslurc"
+  run "$BATS_TEST_TMPDIR/wslview" --skip-validation-check 'https://example.test'
+  [ "$status" -eq 0 ]
+  refute_called 'curl'
+  decoded=$(decode_winps_log)
+  [[ "$decoded" == *"https://example.test"* ]]
 }
 
 @test "wslview selects Explorer without opening it" {

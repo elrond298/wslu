@@ -2,8 +2,16 @@
 link_args=()
 reveal_path=""
 reveal_mode=0
+# Kept only so that an existing WSLVIEW_SKIP_VALIDATION_CHECK value is still accepted
+# and still validated; the probe it used to control is gone.
 skip_validation_check=${WSLVIEW_SKIP_VALIDATION_CHECK:-1}
 WSLVIEW_DEFAULT_ENGINE=${WSLVIEW_DEFAULT_ENGINE:-powershell}
+WSLVIEW_USE_HELPER=${WSLVIEW_USE_HELPER:-true}
+helper_action=open
+wslview_helper_script="${wslu_dest_dir}${wslu_prefix}/share/wslu/wslview-helper.ps1"
+wslview_helper_port_file="${wslu_state_dir}/wslview-helper.port"
+wslview_helper_token_file="${wslu_state_dir}/wslview-helper.token"
+wslview_helper_stamp_file="${wslu_state_dir}/wslview-helper.attempt"
 browser_action=""
 launch_option=0
 link_argument_set=0
@@ -27,7 +35,8 @@ Arguments:
 
 Options:
   -E, --engine ENGINE          Select one of the launchers described above.
-  -s, --skip-validation-check Skip the curl HTTP HEAD request used to validate URLs.
+  -s, --skip-validation-check Accepted for compatibility and does nothing; wslview
+                              no longer probes a URL before opening it.
   --reveal PATH               Highlight PATH in its Windows Explorer folder
                               instead of opening it.
   -r, --reg-as-browser        Register wslview with update-alternatives; uses sudo.
@@ -39,11 +48,20 @@ Options:
 
 Configuration defaults:
   WSLVIEW_DEFAULT_ENGINE=powershell
-  WSLVIEW_SKIP_VALIDATION_CHECK=1   Validate URLs; set to 0 to skip validation.
+  WSLVIEW_SKIP_VALIDATION_CHECK=1   Accepted for compatibility and ignored.
+  WSLVIEW_USE_HELPER=true            Launch through the resident helper when WSL can
+                                     reach the Windows loopback; set to false to always
+                                     launch powershell.exe directly.
 
-URL validation uses curl to send an HTTP HEAD request. A failed probe does not
-rewrite the input as a filesystem path; the original URL is still opened. Opening
-Linux paths or Linux file: URLs requires Windows build 1903 or newer.
+wslview opens a URL exactly as given, without probing it first. Earlier versions sent an
+HTTP HEAD request to decide whether a value was a URL or a filesystem path; that decision
+comes from the argument itself, so the probe could not change the outcome and only cost
+time. Opening Linux paths or Linux file: URLs requires Windows build 1903 or newer.
+
+wslview keeps a helper process alive on the Windows side so that a launch costs one
+loopback socket round trip instead of a PowerShell startup. The helper is only
+reachable in WSL mirrored networking mode; otherwise, and whenever it is not running,
+wslview starts one for the next call and launches the slow way for this one.
 
 Browser registration is unsupported on Arch Linux and Alpine Linux. The export
 method may edit .bashrc, .zshrc, and .kshrc in the home directory.
@@ -118,14 +136,90 @@ function add_browser_export {
 	done
 }
 
-function url_validator {
-	curl --head --silent --fail -g -- "$1" >/dev/null
+# Launching through the resident helper.
+#
+# wslview-helper.ps1 keeps a powershell.exe and its Shell.Application COM object
+# alive, so a launch costs one loopback socket round trip instead of ~200ms of
+# PowerShell startup plus ~40ms of COM construction. wslview talks to it with
+# bash's /dev/tcp, which is a builtin and therefore starts no process at all.
+#
+# Returns 0 when the helper ran the action, 1 when it ran it and the launcher
+# failed, and 2 when the helper could not be reached - the caller then starts
+# one for the next call and launches the slow way for this one.
+function wslview_helper_request() {
+	local action="$1" payload="$2" port token reply
+
+	[ "$WSLVIEW_USE_HELPER" == "true" ] || return 2
+	[ -f "$wslview_helper_port_file" ] || return 2
+	[ -f "$wslview_helper_token_file" ] || return 2
+
+	port=$(<"$wslview_helper_port_file")
+	token=$(<"$wslview_helper_token_file")
+	[[ "$port" =~ ^[0-9]+$ ]] || return 2
+	[ -n "$token" ] || return 2
+
+	{ exec 3<>/dev/tcp/127.0.0.1/"$port"; } 2>/dev/null || return 2
+	printf '%s\t%s\t%s\n' "$token" "$action" "$payload" >&3
+	IFS= read -r -t 5 reply <&3
+	reply="${reply%$'\r'}" # tolerate a CRLF reply from an older helper
+	exec 3<&- 3>&-
+	debug_echo "wslview_helper_request: $action -> ${reply:-no reply}"
+
+	case "$reply" in
+		OK) return 0 ;;
+		FAIL) return 1 ;;
+	esac
+	return 2
+}
+
+# Start the helper in the background.
+#
+# Deliberately does not wait for it: this call falls back to the slow path and
+# the next one finds the helper already listening, so the helper never adds
+# latency to a launch. The helper binds its own ephemeral port and publishes it,
+# so wslview never connects to a port it does not own.
+function wslview_helper_autostart() {
+	local token port_win last now
+
+	[ "$WSLVIEW_USE_HELPER" == "true" ] || return 0
+	[ -f "$wslview_helper_script" ] || return 0
+	[ -x "$(windows_system32)/WindowsPowerShell/v1.0/powershell.exe" ] || return 0
+
+	# Rate limit. In WSL NAT networking mode the helper can never be reached, and
+	# without this every call would start another one and leave it to idle out.
+	now="$(date +%s)"
+	last=""
+	[ -f "$wslview_helper_stamp_file" ] && last=$(<"$wslview_helper_stamp_file")
+	if [[ "$last" =~ ^[0-9]+$ ]] && [ $(( now - last )) -lt 60 ]; then
+		debug_echo "wslview_helper_autostart: rate limited"
+		return 0
+	fi
+	printf '%s\n' "$now" > "$wslview_helper_stamp_file"
+
+	if [ ! -s "$wslview_helper_token_file" ]; then
+		(umask 077; head -c 24 /dev/urandom | base64 > "$wslview_helper_token_file")
+	fi
+	token=$(<"$wslview_helper_token_file")
+	[ -n "$token" ] || return 0
+
+	# The helper publishes its port here, so deleting it first makes "the file
+	# exists" mean "a helper bound successfully and can be reached".
+	rm -f "$wslview_helper_port_file"
+	port_win="$(wslpath -w "$wslview_helper_port_file")" || return 0
+	script_win="$(wslpath -w "$wslview_helper_script")" || return 0
+
+	"$(windows_system32)/WindowsPowerShell/v1.0/powershell.exe" \
+		-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden \
+		-File "$script_win" -PortFile "$port_win" -Token "$token" >/dev/null 2>&1 &
+	disown 2>/dev/null || true
+	debug_echo "wslview_helper_autostart: helper starting"
+	return 0
 }
 
 
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-		-s|--skip-validation-check) launch_option=1; skip_validation_check=0; shift;;
+		-s|--skip-validation-check) launch_option=1; shift;;
 		-r|--reg-as-browser)
 			[ -z "$browser_action" ] || { error_echo "Only one ACTION is allowed." 22; exit 22; }
 			browser_action="register"; shift;;
@@ -220,8 +314,14 @@ if [ "$reveal_mode" -eq 1 ]; then
 		error_echo "--reveal requires an existing Linux path or a Windows path." 22
 	fi
 	debug_echo "reveal_target: $reveal_target"
-	winps_exec "\$ErrorActionPreference='Stop'; & explorer.exe ($(winps_string "/select,$reveal_target"))"
-	exit $?
+	wslview_helper_request reveal "$reveal_target"
+	rc=$?
+	if [ "$rc" -eq 2 ]; then
+		wslview_helper_autostart
+		winps_exec "\$ErrorActionPreference='Stop'; & explorer.exe ($(winps_string "/select,$reveal_target"))"
+		rc=$?
+	fi
+	exit "$rc"
 fi
 
 if [ "$link_argument_set" -eq 0 ]; then
@@ -259,18 +359,26 @@ for lname in "${link_args[@]}"; do
 		target="$lname"
 	else
 		debug_echo "Treating input as a URL"
-		if [ "$skip_validation_check" -ne 0 ] && ! url_validator "$lname"; then
-			debug_echo "URL validation failed; preserving the original URL"
-		fi
 		target="$lname"
 	fi
 	debug_echo "target: $target"
-	if [[ "$WSLVIEW_DEFAULT_ENGINE" == "powershell" || "$WSLVIEW_DEFAULT_ENGINE" == "cmd" ]]; then
-		winps_exec "\$ErrorActionPreference='Stop'; \$shell=New-Object -ComObject Shell.Application; \$shell.ShellExecute($(winps_string "$target"))"
-	elif [[ "$WSLVIEW_DEFAULT_ENGINE" == "cmd_explorer" ]]; then
-		winps_exec "\$ErrorActionPreference='Stop'; & explorer.exe ($(winps_string "$target"))"
-	fi
+	case "$WSLVIEW_DEFAULT_ENGINE" in
+		powershell|cmd) helper_action=open ;;
+		cmd_explorer) helper_action=explorer ;;
+	esac
+
+	wslview_helper_request "$helper_action" "$target"
 	rc=$?
+	if [ "$rc" -eq 2 ]; then
+		# No helper yet: start one for the next call, then launch the slow way.
+		wslview_helper_autostart
+		if [[ "$WSLVIEW_DEFAULT_ENGINE" == "powershell" || "$WSLVIEW_DEFAULT_ENGINE" == "cmd" ]]; then
+			winps_exec "\$ErrorActionPreference='Stop'; \$shell=New-Object -ComObject Shell.Application; \$shell.ShellExecute($(winps_string "$target"))"
+		elif [[ "$WSLVIEW_DEFAULT_ENGINE" == "cmd_explorer" ]]; then
+			winps_exec "\$ErrorActionPreference='Stop'; & explorer.exe ($(winps_string "$target"))"
+		fi
+		rc=$?
+	fi
 	if [ "$rc" -ne 0 ] && [ "$launch_status" -eq 0 ]; then
 		launch_status=$rc
 	fi
