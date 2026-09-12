@@ -65,3 +65,25 @@ EOF
   [ ! -e "$XDG_STATE_HOME/wslu/baseexec" ]
   [ "$(cat "$XDG_STATE_HOME/wslu/triggered_time")" -gt 2 ]
 }
+
+@test "header keeps the startup cache once the install stamp exists" {
+  printf '100\n' > "$WSLU_DESTDIR/usr/share/wslu/updated_time"
+  run out/wslview --help
+  [ "$status" -eq 0 ]
+  cp "$XDG_STATE_HOME/wslu/triggered_time" "$BATS_TEST_TMPDIR/t1"
+  cp "$XDG_STATE_HOME/wslu/oemcp" "$BATS_TEST_TMPDIR/o1"
+  run out/wslview --help
+  [ "$status" -eq 0 ]
+  cmp -s "$BATS_TEST_TMPDIR/t1" "$XDG_STATE_HOME/wslu/triggered_time"
+  cmp -s "$BATS_TEST_TMPDIR/o1" "$XDG_STATE_HOME/wslu/oemcp"
+}
+
+@test "make install stamps updated_time like the package recipes do" {
+  staged="$BATS_TEST_TMPDIR/stage"
+  run make DESTDIR="$staged" PREFIX=/usr install
+  [ "$status" -eq 0 ]
+  stamp="$staged/usr/share/wslu/updated_time"
+  [ -s "$stamp" ]
+  now=$(date +%s)
+  [ "$(cat "$stamp")" -le "$now" ]
+}

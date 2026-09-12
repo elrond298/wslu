@@ -67,6 +67,10 @@ res_install:
 	install -Dm 755 src/etc/*.sh -t $(DESTDIR)$(PREFIX)/share/wslu
 	install -Dm 644 src/etc/wslview.desktop -t $(DESTDIR)$(PREFIX)/share/applications
 	install -Dm 644 src/etc/conf $(DESTDIR)$(PREFIX)/share/wslu
+	# Stamp the install time, exactly like the RPM/Alpine/Arch packaging recipes
+	# do, so the header's oemcp cache is rebuilt once per install instead of on
+	# every single run (the file not existing makes that branch always true).
+	date +"%s" > $(DESTDIR)$(PREFIX)/share/wslu/updated_time
 
 conf_install:
 	install -Dm 644 src/etc/user/conf -t $(DESTDIR)/etc/wslu
