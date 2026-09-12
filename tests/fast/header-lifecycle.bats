@@ -50,18 +50,18 @@ EOF
   [[ "$output" == *"Refusing unsafe resource destination"* ]]
 }
 
-@test "header regenerates exact base executable state when stale" {
+@test "header refreshes oemcp and triggered_time when stale; baseexec stays on demand" {
   run out/wslview --help
   [ "$status" -eq 0 ]
-  [ "$(cat "$XDG_STATE_HOME/wslu/baseexec")" = 'C:\Windows\System32\wsl.exe' ]
+  [ ! -e "$XDG_STATE_HOME/wslu/baseexec" ]
   [[ -s "$XDG_STATE_HOME/wslu/oemcp" ]]
   [[ -s "$XDG_STATE_HOME/wslu/triggered_time" ]]
 
   printf '1\n' > "$XDG_STATE_HOME/wslu/triggered_time"
   printf '2\n' > "$WSLU_DESTDIR/usr/share/wslu/updated_time"
-  rm -f "$XDG_STATE_HOME/wslu/baseexec"
+  printf 'STALE\n' > "$XDG_STATE_HOME/wslu/baseexec"
   run out/wslview --help
   [ "$status" -eq 0 ]
-  [ "$(cat "$XDG_STATE_HOME/wslu/baseexec")" = 'C:\Windows\System32\wsl.exe' ]
+  [ ! -e "$XDG_STATE_HOME/wslu/baseexec" ]
   [ "$(cat "$XDG_STATE_HOME/wslu/triggered_time")" -gt 2 ]
 }
