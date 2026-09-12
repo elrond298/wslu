@@ -75,6 +75,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/wslvar
 %{_bindir}/wslgsu
 %{_bindir}/wslclip
+%{_bindir}/wslnotify
 /usr/share/wslu/
 /usr/share/applications/
 /etc/wslu

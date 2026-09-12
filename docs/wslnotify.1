@@ -1,0 +1,33 @@
+.TH "WSLNOTIFY" "1" "DATEPLACEHOLDER" "VERSIONPLACEHOLDER" "WSL Utilities User Manual"
+.SH NAME
+.B wslnotify
+- Component of WSL Utilities
+.SH SYNOPSIS
+.B wslnotify
+.RB [ OPTIONS ]
+.B TEXT
+.RI [ TEXT ...]
+.SH DESCRIPTION
+Send a Windows toast notification from WSL. TEXT and all remaining words become the body of the toast; the first, bold line defaults to WSL and can be overridden with \fB--title\fR. The toast is shown under the Windows PowerShell app identity, so it lands in the Windows Action Center; Windows notification settings can suppress it. Use \fB--\fR before text beginning with a dash.
+.SH OPTIONS
+.TP
+.B -h, --help
+Print a simple help.
+.TP
+.B -v, --version
+Print current version.
+.TP
+.B -t, --title \fITITLE\fR
+Set the first, bold line of the toast. Defaults to WSL.
+.SH AUTHOR
+Created by Patrick Wu <me@patrickwu.space>
+.SH REPORTING BUGS
+Report bugs to <https://github.com/wslutilities/wslu/issues>
+.SH COPYRIGHT
+This is free software; you can redistribute it and/or modify it under
+the terms of the GNU GPL version 3 or (at your option) any later
+version.
+There is NO warranty; not even MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+.SH SEE ALSO
+wslu(7)
