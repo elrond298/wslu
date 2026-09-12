@@ -198,6 +198,13 @@ function winps_string {
 	printf "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'))" "$encoded"
 }
 
+function require_linux_path_build {
+	if ! [[ "$1" =~ ^[0-9]{1,9}$ ]]; then
+		error_echo "Unable to determine the Windows build number." 34
+	fi
+	[ "$1" -ge "$BN_MAY_NINETEEN" ] || error_echo "Linux paths require Windows build 1903 or newer." 34
+}
+
 function winps_exec_stdin {
 	debug_echo "winps_exec_stdin: called"
 	"$(windows_system32)"/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$1"
