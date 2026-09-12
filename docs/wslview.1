@@ -57,6 +57,23 @@ cmd_explorer: use explorer.exe directly
 .TP
 .B WSLVIEW_SKIP_VALIDATION_CHECK
 whether to skip validation check. Default is 1, which is not skipping. Can be either `0` or `1`.
+.SH NOTES
+Opening a file stored in the Linux filesystem launches it through the
+.B \e\ewsl.localhost\e\eDISTRO\e\e
+network share. Windows treats this share as a location outside the local network, so opening such a file may show an
+"Open File - Security Warning" dialog. To stop the prompt, add the share host to the Local intranet zone once per Windows user:
+.PP
+.RS
+.nf
+reg.exe add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\ZoneMap\\Domains\\wsl.localhost" /v file /t REG_DWORD /d 1 /f
+.fi
+.RE
+.PP
+Use
+.B wsl$
+instead of
+.B wsl.localhost
+for setups still relying on the legacy share name. Revert by deleting the added registry value.
 .SH AUTHOR
 Created by Patrick Wu <me@patrickwu.space>
 .SH REPORTING BUGS
