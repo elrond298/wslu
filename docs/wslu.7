@@ -44,8 +44,19 @@ Entering debug mode.
 .B --verbose
 Entering verbose mode.
 .SH CONFIGURATION
-.TP
 The default configuration is stored in /usr/share/wslu/conf. You can override the default configuration in  \'/etc/wslu/conf\', \'/etc/wslu/custom.conf\', \'$HOME/.config/wslu/conf\', or \'$HOME/.wslurc\'. They will be read in the direction they are listed.
+.TP
+.B WSLU_POWERSHELL_CHCP_WORKAROUND
+control whether to enable the chcp workaround for powershell. By default it is true; if you encounter any PowerShell issues, you can try to disable it.
+.TP
+.B WSLVIEW_DEFAULT_ENGINE
+select the Windows launcher used by \fBwslview\fR(1): \fBpowershell\fR (default), \fBcmd\fR, or \fBcmd_explorer\fR.
+.TP
+.B WSLVIEW_SKIP_VALIDATION_CHECK
+accepted for compatibility and ignored. It is still validated, so it must be `0` or `1`, but it no longer selects anything.
+.TP
+.B WSLVIEW_USE_HELPER
+whether \fBwslview\fR(1) launches through the resident helper that ships with wslu. Default is "true". Can be either `true` or `false`; see the HELPER section of \fBwslview\fR(1).
 .SH EXIT STATUS
 .TP
 .B 1
@@ -80,10 +91,6 @@ unsupported feature (for your Windows 10 build)
 .TP
 .B 40
 Unknown system input.
-.SH CONFIGURATION
-.TP
-.B WSLVIEW_DEFAULT_ENGINE
-control whether to enable the chcp workaround for powershell. By default it is true; if you encounter any PowerShell issues, you can try to disable it.
 .SH BUG
 Report bugs to <https://github.com/wslutilities/wslu/issues>;
 For Ubuntu specific bugs, report to <https://bugs.launchpad.net/ubuntu/+source/wslu>.

@@ -32,8 +32,9 @@ wslu
 |  |  |-wsl-term.ico: default icon for wslusc cli shortcut
 |  |  |-sudo.ps1: helper script for wslgsu
 |  |  |-get_dpi.ps1: helper script for dpi function in wslsys
-|  |  |-wslsc-helper.sh: helper script for wslusc on WSL side
-|  |  \-runHidden.vbs: helper script for wslusc on Windows side
+|  |  |-wslusc-helper.sh: helper script for wslusc on WSL side
+|  |  |-runHidden.vbs: helper script for wslusc on Windows side
+|  |  \-wslview-helper.ps1: resident Windows-side helper for wslview
 |  |-wslu-header: Header file of all script
 |  \-<components>.sh: Components of script
 |-tests: location for script tests

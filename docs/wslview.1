@@ -81,6 +81,7 @@ for setups still relying on the legacy share name. Revert by deleting the added 
 wslview normally keeps a small helper process alive on the Windows side. The helper
 holds a
 .B powershell.exe
+process and its Shell.Application COM object open, so a launch costs one loopback
 socket round trip instead of a whole PowerShell startup. On a typical machine that
 turns a launch from several hundred milliseconds into roughly 150ms.
 .PP
