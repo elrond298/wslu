@@ -90,6 +90,13 @@ the current call goes the usual way and a helper is started in the background, s
 only the first launch after it is missing is slow. It exits after two hours without
 a request.
 .PP
+Windows only lets a process that recently received input bring a new window to
+the foreground; windows opened from a background process merely flash in the
+taskbar instead. Because both the helper and the fallback launcher run in the
+background, they tap an unassigned key (F24 or F16) on the Windows side right
+before opening anything. That grants them the foreground right, so opened
+windows take the foreground as usual.
+.PP
 The helper only listens on the Windows loopback interface, which WSL can reach in
 mirrored networking mode. In NAT mode it cannot, so the helper is simply never used
 and wslview keeps launching

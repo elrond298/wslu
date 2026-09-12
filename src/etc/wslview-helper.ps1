@@ -36,6 +36,11 @@
 #     wslview falls back to launching powershell.exe and this helper is simply
 #     never used. Add a -BindAddress for the vEthernet (WSL) address in here and
 #     in src/wslview.sh if NAT mode ever needs it.
+#   * The launching actions tap F24 first: a background process may not take
+#     the foreground, so without that nudge the opened windows would only
+#     flash in the taskbar. The fallback launcher in wslview.sh taps F16 for
+#     the same reason.
+#
 #   * A request must never be able to kill the helper: every failure path still
 #     writes a reply, otherwise wslview sits in `read -t` until it times out.
 
@@ -46,7 +51,24 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-
+# The helper is a background process, so Windows will not let the windows it opens
+# take the foreground; they only flash in the taskbar. A synthetic tap on F24 (a
+# key nothing binds, unlike e.g. Alt) right before a launch makes this process
+# the one that received the last input event, which grants it the foreground
+# right. Keep the nudge in this process, immediately before the launch.
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class ForegroundNudge {
+	[DllImport("user32.dll")]
+	public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+}
+'@
+function Invoke-ForegroundNudge {
+	# VK_F24 = 0x87; KEYEVENTF_KEYUP = 2
+	[ForegroundNudge]::keybd_event(0x87, 0, 0, [UIntPtr]::Zero)
+	[ForegroundNudge]::keybd_event(0x87, 0, 2, [UIntPtr]::Zero)
+}
 # Bind an ephemeral port and publish it, instead of taking a port from wslview.
 # Windows keeps reserved port ranges that netstat does not report, and in WSL
 # mirrored networking mode the loopback port space is shared with the Linux side,
@@ -92,9 +114,9 @@ while ($running) {
 			try {
 				switch ($fields[1]) {
 					'ping' { $reply = 'OK' }
-					'open' { $shell.ShellExecute($payload); $reply = 'OK' }
-					'explorer' { & explorer.exe $payload; $reply = 'OK' }
-					'reveal' { & explorer.exe "/select,$payload"; $reply = 'OK' }
+					'open' { Invoke-ForegroundNudge; $shell.ShellExecute($payload); $reply = 'OK' }
+					'explorer' { Invoke-ForegroundNudge; & explorer.exe $payload; $reply = 'OK' }
+					'reveal' { Invoke-ForegroundNudge; & explorer.exe "/select,$payload"; $reply = 'OK' }
 					'quit' { $reply = 'OK'; $running = $false }
 					default { $reply = 'ERR action' }
 				}

@@ -318,7 +318,8 @@ if [ "$reveal_mode" -eq 1 ]; then
 	rc=$?
 	if [ "$rc" -eq 2 ]; then
 		wslview_helper_autostart
-		winps_exec "\$ErrorActionPreference='Stop'; & explorer.exe ($(winps_string "/select,$reveal_target"))"
+		# Same focus nudge as the main path: see the comment in the launch loop.
+		winps_exec "(New-Object -ComObject WScript.Shell).SendKeys('{F16}'); \$ErrorActionPreference='Stop'; & explorer.exe ($(winps_string "/select,$reveal_target"))"
 		rc=$?
 	fi
 	exit "$rc"
@@ -372,10 +373,14 @@ for lname in "${link_args[@]}"; do
 	if [ "$rc" -eq 2 ]; then
 		# No helper yet: start one for the next call, then launch the slow way.
 		wslview_helper_autostart
+		# The slow way runs in a background powershell, which has no foreground
+		# right: without a synthetic key tap first (F16, bound by nothing), the
+		# opened window only flashes in the taskbar. The resident helper does the
+		# same nudge in-process (ForegroundNudge).
 		if [[ "$WSLVIEW_DEFAULT_ENGINE" == "powershell" || "$WSLVIEW_DEFAULT_ENGINE" == "cmd" ]]; then
-			winps_exec "\$ErrorActionPreference='Stop'; \$shell=New-Object -ComObject Shell.Application; \$shell.ShellExecute($(winps_string "$target"))"
+			winps_exec "(New-Object -ComObject WScript.Shell).SendKeys('{F16}'); \$ErrorActionPreference='Stop'; \$shell=New-Object -ComObject Shell.Application; \$shell.ShellExecute($(winps_string "$target"))"
 		elif [[ "$WSLVIEW_DEFAULT_ENGINE" == "cmd_explorer" ]]; then
-			winps_exec "\$ErrorActionPreference='Stop'; & explorer.exe ($(winps_string "$target"))"
+			winps_exec "(New-Object -ComObject WScript.Shell).SendKeys('{F16}'); \$ErrorActionPreference='Stop'; & explorer.exe ($(winps_string "$target"))"
 		fi
 		rc=$?
 	fi
