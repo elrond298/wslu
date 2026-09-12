@@ -41,43 +41,83 @@ fi
 # prevent bash -x
 set +x
 
-bash_version_full=$(bash --version | head -n 1)
-bash_version_major=$(echo "$bash_version_full" | cut -d ' ' -f 4 | cut -d '.' -f 1)
-bash_version_minor=$(echo "$bash_version_full" | cut -d ' ' -f 4 | cut -d '.' -f 2)
+# Bash version without forking: $BASH_VERSION is "major.minor.patch(...)-release".
+# The pipeline fallback keeps the historical detection when this file is run by a
+# shell that is not bash (e.g. `sh out/wslview`), where BASH_VERSION is unset.
+if [ -n "${BASH_VERSION:-}" ]; then
+	bash_version_major=${BASH_VERSION%%.*}
+	_wslu_bash_version=${BASH_VERSION#*.}
+	bash_version_minor=${_wslu_bash_version%%.*}
+	unset _wslu_bash_version
+else
+	bash_version_full=$(bash --version | head -n 1)
+	bash_version_major=$(echo "$bash_version_full" | cut -d ' ' -f 4 | cut -d '.' -f 1)
+	bash_version_minor=$(echo "$bash_version_full" | cut -d ' ' -f 4 | cut -d '.' -f 2)
+fi
 
 
 # conf handling module
 __wsl_conf_read() {
-	if [ -f "${wslu_dest_dir}/etc/wsl.conf" ]; then
-		tmp="$(sed -nr "/^\[${1}\]/ { :l /^${2}[ ]*=/ { s/[^=]*=[ ]*//; p; q;}; n; b l;}" "${wslu_dest_dir}/etc/wsl.conf")"
-		if [ -n "$tmp" ]; then
-			if [ ${#tmp} -ge 2 ]; then
-				if [ "${tmp:0:1}" == '"' ] && [ "${tmp: -1}" == '"' ]; then
-					echo "${tmp:1:-1}"
-				elif [ "${tmp:0:1}" == "'" ] && [ "${tmp: -1}" == "'" ]; then
-					echo "${tmp:1:-1}"
-				else
-					echo "$tmp"
-				fi
-			else
-				echo "$tmp"
-			fi
+	# Pure-bash replacement for the historical sed scan, with the same semantics:
+	# the scan starts at [$1] and then runs to the end of the file looking for a
+	# line matching ^$2[ ]*= (it does not stop at the next section), only spaces
+	# may sit between the key and '=', and the quote-stripping below is unchanged.
+	local tmp line rest in_section=0
+	[ -f "${wslu_dest_dir}/etc/wsl.conf" ] || return 0
+	while IFS= read -r line || [ -n "$line" ]; do
+		if [ "$in_section" -eq 0 ]; then
+			case $line in
+				"[$1]"*) in_section=1 ;;
+			esac
+			continue
 		fi
-	fi
+		case $line in
+			"$2"*=*)
+				# bash rejects a bracket expression right after a quoted parameter in
+				# a case pattern, so validate the historical ^key[ ]*= shape (only
+				# spaces, then '=') on the remainder instead of in the pattern.
+				rest=${line#"$2"}
+				case $rest in
+					' '*|'='*) ;;
+					*) continue ;;
+				esac
+				tmp=${line#*=}
+				tmp=${tmp#"${tmp%%[! ]*}"} # strip leading spaces, as sed's [ ]* did
+				if [ -n "$tmp" ]; then
+					if [ ${#tmp} -ge 2 ]; then
+						if [ "${tmp:0:1}" == '"' ] && [ "${tmp: -1}" == '"' ]; then
+							echo "${tmp:1:-1}"
+						elif [ "${tmp:0:1}" == "'" ] && [ "${tmp: -1}" == "'" ]; then
+							echo "${tmp:1:-1}"
+						else
+							echo "$tmp"
+						fi
+					else
+						echo "$tmp"
+					fi
+				fi
+				return 0
+				;;
+		esac
+	done < "${wslu_dest_dir}/etc/wsl.conf"
 }
 
 # checking interopability
-if __wsl_conf_read interop enabled | grep false >/dev/null; then
+case $(__wsl_conf_read interop enabled) in
+*false*)
 	 echo -e "WSL Interopability is disabled and WSL Utilities won't work. Please enable it by:
 	1. open /etc/wsl.conf using root or equivalent editing permission;
 	2. under [interop] section, set enabled to true;
 	3. restart your distribution."
 	exit 1
-elif [ -f "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop" ] && grep -q '^disabled' "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop"; then
+	;;
+esac
+if [ -f "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop" ] && grep -q '^disabled' "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop"; then
     echo "WSL Interopability is temporarily disabled and WSL Utilities won't work. Please enable it by:
     # echo 1 > /proc/sys/fs/binfmt_misc/WSLInterop"
     exit 1
-elif [ -f "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop-late" ] && grep -q '^disabled' "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop-late"; then
+fi
+if [ -f "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop-late" ] && grep -q '^disabled' "$wslu_proc_dir/sys/fs/binfmt_misc/WSLInterop-late"; then
     echo "WSL Interopability is temporarily disabled and WSL Utilities won't work. Please enable it by:
     # echo 1 > /proc/sys/fs/binfmt_misc/WSLInterop-late"
     exit 1
@@ -100,27 +140,28 @@ fi
 
 # variables
 ## color
-black=$(echo -e '\e[30m')
-red=$(echo -e '\e[31m')
-green=$(echo -e '\e[32m')
-brown=$(echo -e '\e[33m')
-blue=$(echo -e '\e[34m')
-purple=$(echo -e '\e[35m')
-cyan=$(echo -e '\e[36m')
-yellow=$(echo -e '\e[33m')
-white=$(echo -e '\e[37m')
-dark_gray=$(echo -e '\e[1;30m')
-light_red=$(echo -e '\e[1;31m')
-light_green=$(echo -e '\e[1;32m')
-light_blue=$(echo -e '\e[1;34m')
-light_purple=$(echo -e '\e[1;35m')
-light_cyan=$(echo -e '\e[1;36m')
-light_gray=$(echo -e '\e[37m')
-orange=$(echo -e '\e[38;5;202m')
-light_orange=$(echo -e '\e[38;5;214m')
-deep_purple=$(echo -e '\e[38;5;140m')
-bold=$(echo -e '\033[1m')
-reset=$(echo -e '\033(B\033[m')
+# printf -v sets these without the subshell fork that $(echo -e ...) costs.
+printf -v black '\e[30m'
+printf -v red '\e[31m'
+printf -v green '\e[32m'
+printf -v brown '\e[33m'
+printf -v blue '\e[34m'
+printf -v purple '\e[35m'
+printf -v cyan '\e[36m'
+printf -v yellow '\e[33m'
+printf -v white '\e[37m'
+printf -v dark_gray '\e[1;30m'
+printf -v light_red '\e[1;31m'
+printf -v light_green '\e[1;32m'
+printf -v light_blue '\e[1;34m'
+printf -v light_purple '\e[1;35m'
+printf -v light_cyan '\e[1;36m'
+printf -v light_gray '\e[37m'
+printf -v orange '\e[38;5;202m'
+printf -v light_orange '\e[38;5;214m'
+printf -v deep_purple '\e[38;5;140m'
+printf -v bold '\033[1m'
+printf -v reset '\033(B\033[m'
 
 ## indicator
 info="${green}[info]${reset}"
@@ -469,13 +510,24 @@ if [ ! -f "${wslu_state_dir}"/triggered_time ] || [ ! -f "${wslu_dest_dir}${wslu
 	var_gen
 # This gets triggered when:
 #    installed time is larger than the last triggered time
-elif [ "$(cat "${wslu_state_dir}"/triggered_time)" -lt "$(cat "${wslu_dest_dir}${wslu_prefix}/share/wslu/updated_time")" ]; then
+elif [ "$(<"${wslu_state_dir}"/triggered_time)" -lt "$(<"${wslu_dest_dir}${wslu_prefix}/share/wslu/updated_time")" ]; then
 	debug_echo "upgraded package; calling var_gen"
 	var_gen
 fi
 
 # basic distro detection
-distro="$(sed -n -e '/^NAME=.*/p' /etc/os-release | sed -e 's/^NAME=\"//g')"
+# Distro detection without forking. Same result as the historical
+# `sed -n '/^NAME=.*/p' /etc/os-release | sed 's/^NAME="//g'`, including keeping the
+# trailing quote, which the case patterns below do not mind.
+distro=""
+if [ -r /etc/os-release ]; then
+	while IFS= read -r _wslu_os_line || [ -n "$_wslu_os_line" ]; do
+		case $_wslu_os_line in
+			NAME=*) distro=${_wslu_os_line#NAME=\"} ;;
+		esac
+	done < /etc/os-release
+	unset _wslu_os_line
+fi
 case $distro in
 	*Clear\ Linux*) distro="clear";;
 	*Common\ Base\ Linux\ Mariner*) distro="cblm";;
