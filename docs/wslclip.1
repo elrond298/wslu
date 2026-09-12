@@ -7,7 +7,7 @@
 .RB [ OPTIONS ]
 .RI [ CONTENT ...]
 .SH DESCRIPTION
-Get or set Windows clipboard content without X or Wayland. CONTENT and all remaining words set the clipboard; piped standard input is used when CONTENT is absent. No input clears the clipboard. Options are parsed only before CONTENT; use \fB--\fR before content beginning with a dash.
+Get or set Windows clipboard content without X or Wayland. CONTENT and all remaining words set the clipboard; piped standard input is used when CONTENT is absent. No input clears the clipboard. A clipboard image, such as a Windows screenshot, is written to a file with \fB--get-image\fR. Options are parsed only before CONTENT; use \fB--\fR before content beginning with a dash.
 .SH OPTIONS
 .TP
 .B -h, --help
@@ -18,6 +18,9 @@ Print current version.
 .TP
 .B -g, --get
 Print Windows clipboard content. This option cannot be combined with CONTENT.
+.TP
+.B -i, --get-image \fIFILE\fR
+Write an image from the clipboard to \fIFILE\fR. The image format follows the FILE extension: png, jpg, jpeg, or bmp, with png as the default. FILE may be a Linux path, which is converted to a Windows path, or a Windows path. This option cannot be combined with --get or CONTENT.
 .SH AUTHOR
 Created by Patrick Wu <me@patrickwu.space>
 .SH REPORTING BUGS

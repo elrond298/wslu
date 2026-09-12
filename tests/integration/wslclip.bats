@@ -44,3 +44,17 @@ teardown() {
   [ "$(clipboard_text_base64)" = "$saved_clipboard_base64" ]
   clipboard_snapshot_ok=0
 }
+
+@test "clipboard image is saved to a file" {
+  run "$WSLU_TEST_POWERSHELL" -NoProfile -NonInteractive -Command '$ErrorActionPreference="Stop"; Add-Type -AssemblyName System.Drawing; Add-Type -AssemblyName System.Windows.Forms; $bmp=New-Object System.Drawing.Bitmap(8,8); [System.Windows.Forms.Clipboard]::SetImage($bmp)'
+  [ "$status" -eq 0 ]
+  run "$WSLU_TEST_POWERSHELL" -NoProfile -NonInteractive -Command '[IO.Path]::GetTempPath()'
+  [ "$status" -eq 0 ]
+  win_tmp=${output%%$'\r'*}
+  shot="$(wslpath -u "$win_tmp")/wslu-clipboard-$$.png"
+  run out/wslclip --get-image "$shot"
+  [ "$status" -eq 0 ]
+  [ -s "$shot" ]
+  head -c 4 "$shot" | od -An -tx1 | grep -q '89 50 4e 47'
+  rm -f "$shot"
+}

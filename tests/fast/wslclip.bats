@@ -52,3 +52,52 @@ setup() {
   run "$BATS_TEST_TMPDIR/wslclip-fail" value
   [ "$status" -eq 8 ]
 }
+
+@test "wslclip saves a clipboard image to a converted Linux path" {
+  target="$WSLU_TEST_ROOT/mnt/c/shots/shot.png"
+  run env TEST_INPUT="$BATS_TEST_TMPDIR/input" "$BATS_TEST_TMPDIR/wslclip" --get-image "$target"
+  [ "$status" -eq 0 ]
+  assert_called "wslpath -w $target"
+  decoded=$(decode_winps_log)
+  [[ "$decoded" == *"C:\\shots\\shot.png"* ]]
+  assert_called 'Clipboard]::GetImage()'
+  assert_called 'ImageFormat]::Png'
+}
+
+@test "wslclip picks the image format from the extension" {
+  target="$WSLU_TEST_ROOT/mnt/c/shots/shot.jpg"
+  run env TEST_INPUT="$BATS_TEST_TMPDIR/input" "$BATS_TEST_TMPDIR/wslclip" --get-image "$target"
+  [ "$status" -eq 0 ]
+  assert_called 'ImageFormat]::Jpeg'
+}
+
+@test "wslclip passes Windows save paths through" {
+  run env TEST_INPUT="$BATS_TEST_TMPDIR/input" "$BATS_TEST_TMPDIR/wslclip" --get-image 'C:/shots/shot.png'
+  [ "$status" -eq 0 ]
+  refute_called 'wslpath -w C:/shots/shot.png'
+  decoded=$(decode_winps_log)
+  [[ "$decoded" == *"C:/shots/shot.png"* ]]
+}
+
+@test "wslclip --get-image rejects --get" {
+  run env TEST_INPUT="$BATS_TEST_TMPDIR/input" "$BATS_TEST_TMPDIR/wslclip" --get-image "$WSLU_TEST_ROOT/mnt/c/a.png" --get
+  [ "$status" -eq 22 ]
+}
+
+@test "wslclip --get-image rejects CONTENT" {
+  run env TEST_INPUT="$BATS_TEST_TMPDIR/input" "$BATS_TEST_TMPDIR/wslclip" --get-image "$WSLU_TEST_ROOT/mnt/c/a.png" text
+  [ "$status" -eq 22 ]
+}
+
+@test "wslclip --get-image requires a file path" {
+  run env TEST_INPUT="$BATS_TEST_TMPDIR/input" "$BATS_TEST_TMPDIR/wslclip" --get-image
+  [ "$status" -eq 22 ]
+}
+
+@test "wslclip propagates image save failures" {
+  make_instrumented_command wslclip \
+    'winps_exec() { return 8; }' \
+    "$BATS_TEST_TMPDIR/wslclip-image-fail"
+  run "$BATS_TEST_TMPDIR/wslclip-image-fail" --get-image "$WSLU_TEST_ROOT/mnt/c/a.png"
+  [ "$status" -eq 8 ]
+}
