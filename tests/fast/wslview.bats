@@ -18,14 +18,14 @@ setup() {
   run "$BATS_TEST_TMPDIR/wslview" --help
   [ "$status" -eq 0 ]
   [ "${lines[0]}" = "wslview - Part of wslu, a collection of utilities for Windows Subsystem for Linux (WSL)" ]
-  [[ "${lines[1]}" =~ ^Usage:\ .*wslview\ \[OPTIONS\]\ LINK_OR_FILE$ ]]
+  [[ "${lines[1]}" =~ ^Usage:\ .*wslview\ \[OPTIONS\]\ LINK_OR_FILE\ \[LINK_OR_FILE\ \.\.\.\]$ ]]
 }
 
 @test "wslview - Help - Alt." {
   run "$BATS_TEST_TMPDIR/wslview" -h
   [ "$status" -eq 0 ]
   [ "${lines[0]}" = "wslview - Part of wslu, a collection of utilities for Windows Subsystem for Linux (WSL)" ]
-  [[ "${lines[1]}" =~ ^Usage:\ .*wslview\ \[OPTIONS\]\ LINK_OR_FILE$ ]]
+  [[ "${lines[1]}" =~ ^Usage:\ .*wslview\ \[OPTIONS\]\ LINK_OR_FILE\ \[LINK_OR_FILE\ \.\.\.\]$ ]]
 }
 
 @test "wslview - Linux - relative" {
@@ -167,4 +167,79 @@ setup() {
     "$BATS_TEST_TMPDIR/wslview-fail"
   run "$BATS_TEST_TMPDIR/wslview-fail" --skip-validation-check https://example.test
   [ "$status" -eq 9 ]
+}
+
+@test "wslview opens multiple Linux paths" {
+  path1="$WSLU_TEST_ROOT/mnt/c/multi/one"
+  path2="$WSLU_TEST_ROOT/mnt/c/multi/two"
+  mkdir -p "$path1" "$path2"
+  run "$BATS_TEST_TMPDIR/wslview" --skip-validation-check "$path1" "$path2"
+  [ "$status" -eq 0 ]
+  assert_called "wslpath -w $path1"
+  assert_called "wslpath -w $path2"
+  [ "$(grep -cF 'ShellExecute(' "$WSLU_TEST_LOG")" -eq 2 ]
+}
+
+@test "wslview opens a URL and a path in one call" {
+  path="$WSLU_TEST_ROOT/mnt/c/mixed"
+  mkdir -p "$path"
+  run "$BATS_TEST_TMPDIR/wslview" --skip-validation-check https://example.test "$path"
+  [ "$status" -eq 0 ]
+  assert_called "wslpath -w $path"
+  decoded=$(decode_winps_log)
+  [[ "$decoded" == *"https://example.test"* ]]
+}
+
+@test "wslview rejects an empty argument among multiple" {
+  path="$WSLU_TEST_ROOT/mnt/c/multi/three"
+  mkdir -p "$path"
+  run "$BATS_TEST_TMPDIR/wslview" --skip-validation-check "" "$path"
+  [ "$status" -eq 22 ]
+  refute_called 'ShellExecute('
+}
+
+@test "wslview reports the first launcher failure across multiple" {
+  make_instrumented_command wslview \
+    'wslu_get_build() { echo 22631; }; winps_exec() { return 9; }' \
+    "$BATS_TEST_TMPDIR/wslview-multi-fail"
+  run "$BATS_TEST_TMPDIR/wslview-multi-fail" --skip-validation-check https://a.test https://b.test
+  [ "$status" -eq 9 ]
+}
+
+@test "wslview --reveal highlights a Linux path in Explorer" {
+  path="$WSLU_TEST_ROOT/mnt/c/reveal/report.pdf"
+  mkdir -p "$(dirname "$path")"
+  touch "$path"
+  run "$BATS_TEST_TMPDIR/wslview" --reveal "$path"
+  [ "$status" -eq 0 ]
+  assert_called "wslpath -w $path"
+  refute_called 'ShellExecute('
+  decoded=$(decode_winps_log)
+  [[ "$decoded" == *"/select,C:\\reveal\\report.pdf"* ]]
+}
+
+@test "wslview --reveal accepts a Windows path" {
+  run "$BATS_TEST_TMPDIR/wslview" --reveal 'C:/Users/Public'
+  [ "$status" -eq 0 ]
+  refute_called "wslpath -w C:/Users/Public"
+  decoded=$(decode_winps_log)
+  [[ "$decoded" == *"/select,C:/Users/Public"* ]]
+}
+
+@test "wslview --reveal rejects a URL" {
+  run "$BATS_TEST_TMPDIR/wslview" --reveal https://example.test
+  [ "$status" -eq 22 ]
+  refute_called '& explorer.exe ('
+}
+
+@test "wslview --reveal rejects a missing Linux path" {
+  run "$BATS_TEST_TMPDIR/wslview" --reveal "$WSLU_TEST_ROOT/does-not-exist"
+  [ "$status" -eq 22 ]
+  refute_called '& explorer.exe ('
+}
+
+@test "wslview --reveal rejects combining with LINK_OR_FILE" {
+  run "$BATS_TEST_TMPDIR/wslview" --reveal 'C:/Users/Public' 'C:/Windows'
+  [ "$status" -eq 22 ]
+  refute_called '& explorer.exe ('
 }

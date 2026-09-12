@@ -7,6 +7,9 @@
 .B wslview
 .RB [ OPTIONS ]
 .I LINK_OR_FILE
+.RI [ LINK_OR_FILE ...]
+.PP
+.B wslview \-\-reveal \fIPATH\fR
 .PP
 .B wslview
 .BR \-r | \-u | \-e
@@ -14,7 +17,7 @@
 .B wslview
 .RB [ \-hv ]
 .SH DESCRIPTION
-This is a file viewer on WSL that allows you to open files and folders from WSL in Windows and a fake web browser that allows opening urls in your default browser on Windows 10.
+This is a file viewer on WSL that allows you to open files and folders from WSL in Windows and a fake web browser that allows opening urls in your default browser on Windows 10. Multiple \fILINK_OR_FILE\fR arguments are accepted; every argument is opened separately.
 .SH OPTIONS
 .TP
 .B -h, --help
@@ -28,6 +31,9 @@ Select \fBpowershell\fR, \fBcmd\fR, or \fBcmd_explorer\fR as the Windows launche
 .TP
 .B -s, --skip-validation-check
 Skip the curl HTTP HEAD probe. A failed probe normally leaves the original URL unchanged and does not convert it to a filesystem path.
+.TP
+.B --reveal \fIPATH\fR
+Highlight \fIPATH\fR in its Windows Explorer folder instead of opening it. \fIPATH\fR must be an existing Linux path or a Windows path; this option cannot be combined with \fILINK_OR_FILE\fR.
 .TP
 .B -u, --unreg-as-browser
 Remove wslview browser registration. This action accepts no LINK_OR_FILE or launch options.
