@@ -32,6 +32,7 @@ all: doc
 
 install: doc_install res_install conf_install
 	install -Dm 755 out/* -t $(DESTDIR)$(PREFIX)/bin
+	if [ -z "$(DESTDIR)" ] && [ -x "$(DESTDIR)$(PREFIX)/bin/wsldoctor" ]; then "$(DESTDIR)$(PREFIX)/bin/wsldoctor" --fix || true; fi
 
 uninstall: 
 	for f in $(INSTEDEXES); do \
