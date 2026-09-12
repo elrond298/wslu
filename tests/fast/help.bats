@@ -7,7 +7,7 @@ setup() {
 }
 
 @test "all commands provide self-contained help" {
-  for command in wslact wslclip wslfetch wslgsu wslnotify wslsys wslupath wslusc wslvar wslview; do
+  for command in wslact wslclip wslfetch wslgsu wsldoctor wslnotify wslsys wslupath wslusc wslvar wslview; do
     run "out/$command" --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"Options:"* ]]

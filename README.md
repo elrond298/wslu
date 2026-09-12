@@ -76,6 +76,7 @@ After installation, run `man 7 wslu` for the overview, `man 1 <command>` for a c
 | `wslfetch` | Display WSL and Windows system information. | [`docs/wslfetch.1`](docs/wslfetch.1) |
 | `wslgsu` | Create WSL startup tasks with Windows Task Scheduler. | [`docs/wslgsu.1`](docs/wslgsu.1) |
 | `wslnotify` | Send Windows toast notifications from WSL. | [`docs/wslnotify.1`](docs/wslnotify.1) |
+| `wsldoctor` | Check the WSL environment wslu depends on and suggest or apply fixes. | [`docs/wsldoctor.1`](docs/wsldoctor.1) |
 | `wslsys` | Print WSL and Windows system information. | [`docs/wslsys.1`](docs/wslsys.1) |
 | `wslusc` | Create Windows Desktop shortcuts for WSL commands. | [`docs/wslusc.1`](docs/wslusc.1) |
 | `wslvar` | Read Windows environment and shell-folder variables. | [`docs/wslvar.1`](docs/wslvar.1) |
