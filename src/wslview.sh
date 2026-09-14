@@ -140,8 +140,11 @@ function add_browser_export {
 #
 # wslview-helper.ps1 keeps a powershell.exe and its Shell.Application COM object
 # alive, so a launch costs one loopback socket round trip instead of ~200ms of
-# PowerShell startup plus ~40ms of COM construction. wslview talks to it with
-# bash's /dev/tcp, which is a builtin and therefore starts no process at all.
+# PowerShell startup plus ~40ms of COM construction. wslview talks to it through
+# bash's /dev/tcp. The port file can outlive the helper (idle timeout, crash,
+# killed process), and in WSL mirrored networking a connect to a dead loopback
+# port never fails, it hangs, so the whole exchange runs under timeout; any
+# failure retires the port file so the next call starts a fresh helper.
 #
 # Returns 0 when the helper ran the action, 1 when it ran it and the launcher
 # failed, and 2 when the helper could not be reached - the caller then starts
@@ -158,11 +161,18 @@ function wslview_helper_request() {
 	[[ "$port" =~ ^[0-9]+$ ]] || return 2
 	[ -n "$token" ] || return 2
 
-	{ exec 3<>/dev/tcp/127.0.0.1/"$port"; } 2>/dev/null || return 2
-	printf '%s\t%s\t%s\n' "$token" "$action" "$payload" >&3
-	IFS= read -r -t 5 reply <&3
+	# shellcheck disable=SC2016 # the child script uses positional args, no expansion wanted
+	reply=$(timeout 6 bash -c '
+		exec 3<>/dev/tcp/127.0.0.1/"$1" || exit 2
+		printf "%s\t%s\t%s\n" "$2" "$3" "$4" >&3
+		IFS= read -r -t 5 line <&3 || exit 3
+		printf "%s" "$line"
+	' wslview-helper "$port" "$token" "$action" "$payload" 2>/dev/null) || {
+		rm -f "$wslview_helper_port_file"
+		debug_echo "wslview_helper_request: $action -> helper unreachable, port file retired"
+		return 2
+	}
 	reply="${reply%$'\r'}" # tolerate a CRLF reply from an older helper
-	exec 3<&- 3>&-
 	debug_echo "wslview_helper_request: $action -> ${reply:-no reply}"
 
 	case "$reply" in

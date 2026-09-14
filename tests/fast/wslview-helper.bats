@@ -53,6 +53,18 @@ install_fake_helper_resource() {
   assert_called 'ShellExecute('
 }
 
+@test "wslview - stale helper port file is retired and the launch falls back" {
+  make_instrumented_wslview \
+    'winps_exec() { printf "launch %s\n" "$*" >> "$WSLU_TEST_LOG"; }' \
+    "$BATS_TEST_TMPDIR/wslview-helper-stale"
+  printf '1\n' > "${XDG_STATE_HOME:-$HOME/.local/state}/wslu/wslview-helper.port"
+  printf 'tok\n' > "${XDG_STATE_HOME:-$HOME/.local/state}/wslu/wslview-helper.token"
+  run "$BATS_TEST_TMPDIR/wslview-helper-stale" --skip-validation-check 'C:/Users/Public'
+  [ "$status" -eq 0 ]
+  [ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/wslu/wslview-helper.port" ]
+  assert_called 'ShellExecute('
+}
+
 @test "wslview - helper maps each engine to its own action" {
   make_instrumented_wslview \
     'wslview_helper_request() { printf "helper %s\n" "$1" >> "$WSLU_TEST_LOG"; return 0; }' \
