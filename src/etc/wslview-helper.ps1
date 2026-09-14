@@ -143,3 +143,8 @@ while ($running) {
 }
 
 $listener.Stop()
+
+# Normal exit (idle timeout or quit): retire the port file so wslview does not
+# find a dead port. An abrupt kill cannot clean up, so wslview bounds its
+# connect and retires the file itself when the helper does not answer.
+Remove-Item -LiteralPath $PortFile -ErrorAction SilentlyContinue
