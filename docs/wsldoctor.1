@@ -7,9 +7,9 @@
 .RB [ \-\-fix ]
 .RB [ \-hv ]
 .SH DESCRIPTION
-Run self-checks on the WSL environment wslu depends on and print a PASS/WARN/FAIL report with fix suggestions. Checks: WSL interop availability, the reachable Windows System32 directory, Windows PowerShell, the Windows build number (1903 or newer is required for converting Linux paths with \fBwslpath \-w\fR), the Local intranet zone mapping for the \fI\\\\wsl.localhost\fR and \fIwsl$\fR share hosts, and the validity of wslu configuration values.
+Run self-checks on the WSL environment wslu depends on and print a PASS/WARN/FAIL report with fix suggestions. Checks: WSL interop availability, the reachable Windows System32 directory, Windows PowerShell, the Windows build number (1903 or newer is required for converting Linux paths with \fBwslpath \-w\fR), the Local intranet zone mapping for the \fI\\\\wsl.localhost\fR and \fIwsl$\fR share hosts, whether the wslview helper port file points at a live helper (a stale file can hang wslview under mirrored networking), and the validity of wslu configuration values.
 .PP
-Without options the doctor only reports and prints the commands that fix each problem. With \fB\-\-fix\fR, safe and idempotent fixes are applied first and reported; the intranet zone entries are the only fix applied this way. Re-run the doctor after restarting WSL to confirm a fix took effect.
+Without options the doctor only reports and prints the commands that fix each problem. With \fB\-\-fix\fR, safe and idempotent fixes are applied first and reported: the intranet zone entries are added and a stale wslview helper port file is removed. Re-run the doctor after restarting WSL to confirm a fix took effect.
 .PP
 Exit status: 0 when every check passes, 1 when at least one check reports WARN or FAIL.
 .SH OPTIONS

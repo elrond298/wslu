@@ -80,3 +80,28 @@ setup() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"WARN  WSLVIEW_DEFAULT_ENGINE is invalid: bogus"* ]]
 }
+
+@test "wsldoctor - helper check passes when no helper is running" {
+  run env WSLU_TEST_ZONE_SET=1 out/wsldoctor
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PASS  wslview helper is not running (it starts on demand)"* ]]
+}
+
+@test "wsldoctor warns on a stale wslview helper port file" {
+  printf '1\n' > "$XDG_STATE_HOME/wslu/wslview-helper.port"
+  printf 'tok\n' > "$XDG_STATE_HOME/wslu/wslview-helper.token"
+  run env WSLU_TEST_ZONE_SET=1 out/wsldoctor
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"WARN  wslview helper port file is stale: no helper answers on that port"* ]]
+  [[ "$output" == *"run wsldoctor --fix"* ]]
+  [ -e "$XDG_STATE_HOME/wslu/wslview-helper.port" ]
+}
+
+@test "wsldoctor --fix removes a stale wslview helper port file" {
+  printf '1\n' > "$XDG_STATE_HOME/wslu/wslview-helper.port"
+  printf 'tok\n' > "$XDG_STATE_HOME/wslu/wslview-helper.token"
+  run env WSLU_TEST_ZONE_SET=1 out/wsldoctor --fix
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PASS  removed the stale wslview helper port file"* ]]
+  [ ! -e "$XDG_STATE_HOME/wslu/wslview-helper.port" ]
+}

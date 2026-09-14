@@ -15,6 +15,8 @@ Checks:
               Local intranet zone; without it, opening files from the Linux
               filesystem shows an "Open File - Security Warning" prompt.
   config      The wslu configuration values are valid.
+  helper      The wslview helper port file points at a live helper; a stale
+              file can hang wslview under mirrored networking.
 
 Without options, the doctor only reports and prints the commands to fix
 problems. With --fix, safe and idempotent fixes are applied first and
@@ -118,6 +120,35 @@ else
     printf '      fix: run wsldoctor --fix, or add the hosts manually:\n'
     printf '      fix:   reg.exe add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\ZoneMap\\Domains\\wsl.localhost" /v file /t REG_DWORD /d 1 /f\n'
     printf '      fix:   reg.exe add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\ZoneMap\\Domains\\wsl$" /v file /t REG_DWORD /d 1 /f\n'
+fi
+
+# The wslview helper publishes its port to a state file. The file can outlive
+# the helper (idle timeout, crash), and in WSL mirrored networking a connect to
+# that dead port hangs instead of being refused, which is how wslview can
+# appear to freeze. Ping the helper through the same bounded exchange wslview
+# uses (wslview_helper_request in src/wslview.sh); the protocol is token TAB
+# action TAB payload, reply OK.
+if [ ! -f "$wslu_state_dir/wslview-helper.port" ]; then
+    doctor_result "PASS" "wslview helper is not running (it starts on demand)"
+else
+    # shellcheck disable=SC2016 # the child script uses positional args, no expansion wanted
+    wslu_doctor_helper_reply="$(timeout 6 bash -c '
+        exec 3<>/dev/tcp/127.0.0.1/"$1" || exit 2
+        printf "%s\t%s\t%s\n" "$2" ping ping >&3
+        IFS= read -r -t 5 line <&3 || exit 3
+        printf "%s" "$line"
+    ' wsldoctor-helper "$(cat "$wslu_state_dir/wslview-helper.port")" "$(cat "$wslu_state_dir/wslview-helper.token" 2>/dev/null)" 2>/dev/null)"
+    wslu_doctor_helper_reply="${wslu_doctor_helper_reply%$'\r'}"
+    if [ "$wslu_doctor_helper_reply" = "OK" ]; then
+        doctor_result "PASS" "wslview helper is running and answering"
+    elif [ "${doctor_fix:-0}" -eq 1 ]; then
+        rm -f "$wslu_state_dir/wslview-helper.port"
+        doctor_result "PASS" "removed the stale wslview helper port file"
+    else
+        doctor_result "WARN" "wslview helper port file is stale: no helper answers on that port"
+        printf '      fix: this file can hang wslview; run wsldoctor --fix, or delete:\n'
+        printf '      fix:   %s\n' "$wslu_state_dir/wslview-helper.port"
+    fi
 fi
 
 if [ -n "${WSLVIEW_DEFAULT_ENGINE:-}" ] && [[ ! "$WSLVIEW_DEFAULT_ENGINE" =~ ^(powershell|cmd|cmd_explorer)$ ]]; then
