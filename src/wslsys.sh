@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# shellcheck disable=SC2329
+# shellcheck disable=SC2329,SC2317 # helpers are invoked indirectly via wslsys's dispatch
 set -o pipefail
 help_short="wslsys [FIELD] [-s]\nwslsys -n NAME [-s]\nwslsys [-hv]"
 help_details='Print WSL and Windows system information. With no argument, print all fields.

@@ -1,0 +1,3 @@
+# `status` exit codes follow systemd/LSB semantics
+
+`wslsvc status` exits `0` when the service is active, `3` when it is inactive, and `4` when the service is unknown, instead of wslu's `error_echo` convention where `0` only means "the command ran" (`1`/`21`/`22` remain reserved for operational failure and CLI misuse, and the mutating verbs keep wslu's codes). We chose this so `wslsvc status foo && …` works as a scripting condition: wslu's convention returns `0` for a stopped service, which makes the verb useless in a script. Considered uniform wslu codes everywhere; rejected for exactly that reason.

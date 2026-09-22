@@ -116,6 +116,9 @@ For contributing, there are several functions and variables built-in the header 
 - `error_echo <error information> <error code>`
 
   Will print error information and return error code. For details of the error code standard for `wslu`, please check [here](https://wslutiliti.es/wslu/faq.html#what-is-the-error-code-returned).
+- `winps_string <string>`
+
+  Will encode a string as a PowerShell expression that decodes it from Base64. Use it for any value interpolated into a PowerShell command so it is passed as data, never as code.
 - `help`
 
   Get help print-out.

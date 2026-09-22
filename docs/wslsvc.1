@@ -1,0 +1,159 @@
+.TH "WSLSVC" "1" "DATEPLACEHOLDER" "VERSIONPLACEHOLDER" "WSL Utilities User Manual"
+.SH NAME
+.B wslsvc
+- Component of WSL Utilities
+.SH SYNOPSIS
+.B wslsvc
+.RB COMMAND
+.I ...
+.SH DESCRIPTION
+Inspect and control Windows services (the Service Control Manager side, not Linux services managed by \fIwslgsu\fR): list them, show one in detail, and start, stop, or restart them.
+.PP
+Five commands are available:
+.in +4n
+.nf
+\fBlist\fR \- List Windows services
+\fBstatus\fR \- Show one Windows service
+\fBstart\fR \- Start a Windows service
+\fBstop\fR \- Stop a Windows service
+\fBrestart\fR \- Restart a Windows service
+.fi
+.in
+.SH SERVICE TARGETS
+For \fIstatus\fR, \fIstart\fR, \fIstop\fR, and \fIrestart\fR, \fISERVICE\fR is an exact service name or exact display name, matched case-insensitively. One service per invocation.
+.PP
+An ambiguous match prints numbered candidates and asks you to pick one on a terminal, then confirms with \fBConfirm ACTION 'Display Name' (Name)? [y/N]\fR. Answering anything but \fIy\fR or \fIyes\fR aborts with exit status 1 and no action. Without an interactive stdin (a terminal), the command prints the candidates on stderr and exits 22 instead of prompting. Exact matches run unattended, so scripts can use them directly.
+.PP
+An unknown service exits 22, except for \fIstatus\fR which exits 4.
+.SH COMMANDS
+.SS "List"
+List (\fIlist\fR) prints one line per Windows service with the columns \fBNAME\fR, \fBSTATE\fR, and \fBDISPLAY NAME\fR.
+.TP
+SYNOPSIS
+.B wslsvc list
+.RB [ SUBSTRING ]
+.RB [ \-\-state= STATE ]
+.RB [ \-h ]
+.TP
+ARGUMENTS
+.nf
+.B SUBSTRING
+.in +4n
+Case-insensitive substring matched against service name and display name. Omit to list every service.
+.in
+.fi
+.TP
+OPTIONS
+.nf
+.B --state=\fISTATE\fR
+.in +4n
+Only show services whose state equals \fISTATE\fR exactly, case-insensitive. Valid states: Stopped, StartPending, StopPending, Running, ContinuePending, PausePending, Paused. Composable with \fISUBSTRING\fR. An invalid value exits 22 before any query runs.
+.in
+.fi
+.nf
+.B -h, --help
+.in +4n
+print a simple help.
+.in
+.fi
+.SS "Status"
+Status (\fIstatus\fR) shows one Windows service in detail: display name and name, state, start type, PID, binary path, run-as account, and description. The start type is display-only; wslsvc has no verbs that change it.
+.TP
+SYNOPSIS
+.B wslsvc status
+.I SERVICE
+.RB [ \-h ]
+.TP
+ARGUMENTS
+.nf
+.B SERVICE
+.in +4n
+Exact service name or display name, case-insensitive.
+.in
+.fi
+.TP
+OPTIONS
+.nf
+.B -h, --help
+.in +4n
+print a simple help.
+.in
+.fi
+.SS "Start, Stop, Restart"
+Start (\fIstart\fR), stop (\fIstop\fR), and restart (\fIrestart\fR) change the service state. \fIrestart\fR is stop followed by start regardless of the current state: restarting a stopped service starts it. Being already in the desired state is a no-op with exit status 0 and a one-line note on stderr.
+.TP
+SYNOPSIS
+.B wslsvc start|stop|restart
+.I SERVICE
+.RB [ \-h ]
+.TP
+ARGUMENTS
+.nf
+.B SERVICE
+.in +4n
+Exact service name or display name, case-insensitive.
+.in
+.fi
+.TP
+OPTIONS
+.nf
+.B -h, --help
+.in +4n
+print a simple help.
+.in
+.fi
+.SH OPTIONS
+.TP
+.B -h, --help
+print a simple help.
+.TP
+.B -v, --version
+print current version.
+.SH EXIT STATUS
+.PP
+\fIstatus\fR follows systemd/LSB semantics so it works as a scripting condition:
+.nf
+.B 0
+.in +4n
+the service is active (Running or Paused)
+.in
+.B 3
+.in +4n
+the service is inactive (Stopped and transitional states like StartPending)
+.in
+.B 4
+.in +4n
+the service is unknown
+.in
+.fi
+.PP
+All commands:
+.nf
+.B 1
+.in +4n
+operational failure, including access denied and a declined confirmation
+.in
+.B 21
+.in +4n
+missing input
+.in
+.B 22
+.in +4n
+invalid input, unknown service (except \fIstatus\fR), or ambiguous match without stdin
+.in
+.fi
+.SH ELEVATION
+Access denied exits 1 with a note that the action needs elevation; rerun from an elevated shell. wslsvc never triggers a UAC prompt.
+.SH AUTHOR
+Created by Patrick Wu <me@patrickwu.space>
+.SH REPORTING BUGS
+Report bugs to <https://github.com/wslutilities/wslu/issues>;
+For Ubuntu specific/related bugs, report to <https://bugs.launchpad.net/ubuntu/+source/wslu>.
+.SH COPYRIGHT
+This is free software; you can redistribute it and/or modify it under
+the terms of the GNU GPL version 3 or (at your option) any later
+version.
+There is NO warranty; not even MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+.SH SEE ALSO
+wslu(7), wslgsu(1)

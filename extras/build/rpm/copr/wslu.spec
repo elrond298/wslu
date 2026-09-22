@@ -74,6 +74,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/wslact
 %{_bindir}/wslvar
 %{_bindir}/wslgsu
+%{_bindir}/wslsvc
 %{_bindir}/wslclip
 %{_bindir}/wsldoctor
 %{_bindir}/wslnotify

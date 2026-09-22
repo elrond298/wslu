@@ -73,6 +73,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/wslstart
 %{_bindir}/wslact
 %{_bindir}/wslgsu
+%{_bindir}/wslsvc
 %{_bindir}/wslvar
 %{_bindir}/wslclip
 %{_bindir}/wsldoctor

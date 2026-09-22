@@ -11,7 +11,7 @@ CURPATH = $(shell pwd)
 SOURCES := $(wildcard src/*.sh)
 ETCFILES := $(wildcard src/etc/*)
 OUTFILES := $(wildcard out/*)
-MANFILES := $(wildcard docs/*)
+MANFILES := $(wildcard docs/*.1) $(wildcard docs/*.7)
 INSTEDEXES := $(wildcard $(DESTDIR)$(PREFIX)/bin/wsl*)
 INSTEDMANOS := $(wildcard $(DESTDIR)$(PREFIX)/share/man/man1/wsl*)
 
