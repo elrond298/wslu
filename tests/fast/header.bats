@@ -56,3 +56,11 @@ setup() {
   format="$(. src/wslu-header; echo "$(sysdrive_prefix)")"
   [ "$format" = "c" ]
 }
+
+@test "Header - winps_exec survives a failed build query" {
+  export WSLU_POWERSHELL_CHCP_WORKAROUND=true
+  export WSLU_TEST_REG_BUILD_FAIL=1
+  run bash -c '. src/wslu-header; winps_exec "Get-Service"'
+  [[ "$output" != *"integer expression expected"* ]]
+  assert_called 'powershell.exe'
+}

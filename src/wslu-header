@@ -348,6 +348,9 @@ function winps_exec {
 	debug_echo "winps_exec: called with command $*"
 	if [[ "$WSLU_POWERSHELL_CHCP_WORKAROUND" == "true" ]]; then
 		wslutmpbuild="$(wslu_get_build)"
+		# An interop timeout can empty the build query; treat unknown as the
+		# oldest build so the chcp workaround still runs (previous behavior).
+		[[ "$wslutmpbuild" =~ ^[0-9]{1,9}$ ]] || wslutmpbuild=0
 		cp="$(cat "${wslu_state_dir}"/oemcp)"
 		[ "$wslutmpbuild" -ge $BN_OCT_NINETEEN ] || chcp_com "$cp"
 		"$(windows_system32)"/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::GetEncoding($cp); $*" </dev/null

@@ -1,4 +1,10 @@
 #!/bin/bash
+# WSLU_TEST_REG_BUILD_FAIL=1 simulates an interop timeout: no output, failure.
+if [ "${WSLU_TEST_REG_BUILD_FAIL:-0}" = "1" ]; then
+  case "$*" in
+    *CurrentBuild*) exit 1 ;;
+  esac
+fi
 cat >/dev/null
 printf 'reg.exe %s\n' "$*" >> "${WSLU_TEST_LOG:?}"
 case "$*" in
