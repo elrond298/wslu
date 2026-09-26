@@ -11,6 +11,15 @@
 .PP
 .B wslview \-\-reveal \fIPATH\fR
 .PP
+.B wslview \-\-on \fITARGET\fR
+.RB [ OPTIONS ]
+.I LINK_OR_FILE
+.RI [ LINK_OR_FILE ...]
+.PP
+.B wslview \-\-on \fITARGET\fR \-\-stop
+.PP
+.B wslview \-\-on \fITARGET\fR \-\-reveal \fIPATH\fR
+.PP
 .B wslview
 .BR \-r | \-u | \-e
 .PP
@@ -34,6 +43,12 @@ Accepted for compatibility and ignored. wslview used to send a curl HTTP HEAD pr
 .TP
 .B --reveal \fIPATH\fR
 Highlight \fIPATH\fR in its Windows Explorer folder instead of opening it. \fIPATH\fR must be an existing Linux path or a Windows path; this option cannot be combined with \fILINK_OR_FILE\fR.
+.TP
+.B --on \fITARGET\fR
+Open on another machine (the target) instead of the local Windows desktop. \fITARGET\fR is passed to \fBssh\fR verbatim, typically an alias from ~/.ssh/config whose login lands in the target WSL instance. A URL is opened on the target as given; a single file is copied to an inbox on the target and opened there with its associated Windows application; a directory is opened in a web file browser on the target. See the REMOTE OPEN section.
+.TP
+.B --stop
+With --on \fITARGET\fR: close the tunnels, stop the file server, and clear the registrations. Accepts no LINK_OR_FILE, --reveal, or launch options. Copied files in the target inbox are kept (see \fBWSLVIEW_ON_INBOX_TTL\fR).
 .TP
 .B -u, --unreg-as-browser
 Remove wslview browser registration. This action accepts no LINK_OR_FILE or launch options.
@@ -60,6 +75,12 @@ accepted for compatibility and ignored. It is still validated, so it must be `0`
 .TP
 .B WSLVIEW_USE_HELPER
 whether to launch through the resident helper that ships with wslu. Default is "true". Can be either `true` or `false`. Set to "false" to always launch \fBpowershell.exe\fR directly.
+.TP
+.B WSLVIEW_ON_PORT
+the loopback port of the file server and of the ssh reverse tunnel. Change it when the port is taken on either side. Default is 8090.
+.TP
+.B WSLVIEW_ON_INBOX_TTL
+days a copied file may stay in the target inbox (\fB~/.cache/wslu/inbox\fR) before a later copy call prunes it. Nothing else removes copied files from the target. Default is 7.
 .SH NOTES
 Opening a file stored in the Linux filesystem launches it through the
 .B \e\ewsl.localhost\e\eDISTRO\e\e
@@ -113,6 +134,15 @@ and
 are deleted; the process itself exits after two idle hours. Set
 .B WSLVIEW_USE_HELPER
 to "false" to disable the helper entirely.
+.SH REMOTE OPEN
+With --on, wslview opens things on the desktop of another machine (the target) instead of the local one. The target is reached over ssh between the WSL instances; in mirrored networking the ssh login on the target machine's IP lands in the target WSL instance. Paths are resolved in the local distro (a Windows path refers to the local Windows filesystem) and are never sent as paths: what crosses ssh is either a copied file or a URL.
+.PP
+Directories and --reveal become URLs of a small web file server (copyparty) that wslview keeps on the loopback interface of the local distro. An ssh reverse tunnel carries that port to the target, so the server is reachable only from targets of explicit --on calls. Every directory opened is registered with the file server while it runs and one server serves them all; --on \fITARGET\fR --stop clears the registrations and all file server state. Browsing needs the copyparty binary on PATH on the originating machine and wslview installed on the target. The tunnel and the server run until --stop, the network drops, or a reboot; the next --on call starts whatever is missing again. Browsing URLs work only while the file server runs; reopening a directory later gives a fresh session.
+.PP
+A single file is copied to \fB~/.cache/wslu/inbox\fR on the target and opened there with its associated Windows application. A file clicked inside the browser view is previewed or downloaded by the browser instead; only a copied file opens in a Windows application. Neither side attaches any filesystem, and no path on the target is ever involved.
+.PP
+A directory opened as an argument is shared read-write: the web file server accepts uploads into it (drag and drop, or the upload button), while moving and deleting is not possible. A directory shown by --reveal is shared read-only. Anything shared this way is browsable and writable from the browser on the target.
+
 .SH AUTHOR
 Created by Patrick Wu <me@patrickwu.space>
 .SH REPORTING BUGS

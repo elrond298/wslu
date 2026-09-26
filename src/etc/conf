@@ -85,3 +85,12 @@ WSLVIEW_SKIP_VALIDATION_CHECK=1
 # only reachable in WSL mirrored networking mode; otherwise, and whenever the helper
 # is not running, wslview launches powershell.exe itself. Can be `true` or `false`.
 WSLVIEW_USE_HELPER=true
+
+# wslview --on: the loopback port of the file server and of the ssh reverse tunnel
+# that carries it to the target. Change it if the port is taken on either side.
+WSLVIEW_ON_PORT=8090
+
+# wslview --on: days a copied file may stay in the target inbox
+# (~/.cache/wslu/inbox) before a later copy call prunes it. Nothing else removes
+# copied files from the target.
+WSLVIEW_ON_INBOX_TTL=7
