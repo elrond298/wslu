@@ -33,3 +33,25 @@ An operation consisting of stop followed by start, regardless of the service's c
 
 **ambiguous match**:
 Service input that resolves to more than one Windows service by name or display name.
+
+## Remote open
+
+**target**:
+The machine where remote opens land, addressed by an ssh alias that reaches its WSL instance.
+_Avoid_: host (reserved for hostnames), machine, remote
+
+**share root**:
+A directory exposed by the file server for remote browsing, registered automatically on first open and dropped when the file server stops.
+_Avoid_: mount point, export, share
+
+**inbox**:
+The directory on a target where files copied for open (app) land.
+_Avoid_: staging area, cache, downloads
+
+**open (app)**:
+An open that launches the file's associated Windows application on the target's desktop.
+_Avoid_: open (unqualified), mount
+
+**open (browse)**:
+An open that shows a directory listing in a web file browser on the target.
+_Avoid_: open (unqualified), mount
