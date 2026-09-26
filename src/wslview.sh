@@ -382,20 +382,13 @@ function wslview_on_source_for() {
 	fi
 }
 
-# True while the pid lives and its cmdline still identifies our file server;
-# the pid file can outlive the process and the pid can be reused.
-function wslview_on_pid_alive() {
-	local pid="$1"
-	kill -0 "$pid" 2>/dev/null || return 1
-	[ -r "/proc/$pid/cmdline" ] && grep -qa "copyparty" "/proc/$pid/cmdline"
-}
 
 function wslview_on_server_running() {
 	local pid=""
 	[ -f "$wslview_on_server_pid_file" ] || return 1
 	pid=$(<"$wslview_on_server_pid_file")
 	[[ "$pid" =~ ^[0-9]+$ ]] || return 1
-	wslview_on_pid_alive "$pid"
+	wslu_pid_check "$pid" copyparty
 }
 
 function wslview_on_server_stop() {
@@ -418,8 +411,7 @@ function wslview_on_tunnels_stop() {
 	local sock port_file
 	for sock in "$wslu_state_dir"/wslview-on-*.sock; do
 		[ -e "$sock" ] || continue
-		ssh -S "$sock" -O exit _ >/dev/null 2>&1 || true
-		rm -f "$sock" "${sock%.sock}.port"
+		wslu_tunnel_close "$sock"
 	done
 	# a master that died on its own leaves its port file behind
 	for port_file in "$wslu_state_dir"/wslview-on-*.port; do
@@ -435,7 +427,7 @@ function wslview_on_server_port() {
 	if ! [[ "$p" =~ ^[0-9]+$ ]]; then
 		# recover a lost port file from the server cmdline, which carries -p PORT
 		[ -f "$wslview_on_server_pid_file" ] && pid=$(<"$wslview_on_server_pid_file")
-		if [[ "$pid" =~ ^[0-9]+$ ]] && wslview_on_pid_alive "$pid"; then
+		if wslu_pid_check "$pid" copyparty; then
 			p=$(tr '\0' '\n' < "/proc/$pid/cmdline" | awk '/^-p$/ { getline; print; exit }')
 		fi
 	fi
@@ -476,7 +468,7 @@ function wslview_on_server_ensure() {
 		# the probe can connect to a foreign listener before copyparty binds (or
 		# fails to); settle, then trust only our own process
 		sleep 0.3
-		if wslview_on_pid_alive "$pid"; then
+		if wslu_pid_check "$pid" copyparty; then
 			cp "$wslview_on_sources_file" "$wslview_on_server_args"
 			printf '%s\n' "$port" > "$wslview_on_server_port_file"
 			if [ "$old_port" != "$port" ]; then
@@ -502,8 +494,7 @@ function wslview_on_tunnel_ensure() {
 		fi
 	fi
 	# no trustworthy port: close whatever is there and build fresh
-	ssh -S "$sock" -O exit _ >/dev/null 2>&1 || true
-	rm -f "$sock" "$port_file"
+	wslu_tunnel_close "$sock"
 	# the remote port starts one hundred above the configured port so the two
 	# roles never share a number (a mutual setup would be ambiguous otherwise),
 	# then falls forward when taken on the target

@@ -419,6 +419,23 @@ function var_gen {
 
 }
 
+# Check whether a pid is alive and its command line contains the given text.
+# A pid file can outlive its process and the pid can be reused.
+function wslu_pid_check {
+	local pid="$1" text="$2"
+	[[ "$pid" =~ ^[0-9]+$ ]] || return 1
+	kill -0 "$pid" 2>/dev/null || return 1
+	[ -r "/proc/$pid/cmdline" ] && grep -qFa "$text" "/proc/$pid/cmdline"
+}
+
+# Close one wslview --on tunnel: end the ssh master behind a control socket
+# and remove the socket together with its recorded port.
+function wslu_tunnel_close {
+	local sock="$1"
+	ssh -S "$sock" -O exit _ >/dev/null 2>&1 || true
+	rm -f "$sock" "${sock%.sock}.port"
+}
+
 function wslu_function_check {
 	# from https://stackoverflow.com/questions/85880/determine-if-a-function-exists-in-bash
 	debug_echo "wslu_function_check: called with $*"

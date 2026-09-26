@@ -152,6 +152,12 @@ For contributing, there are several functions and variables built-in the header 
 - `wslu_function_check <function_name>`
 
   Check whether a function exists.
+- `wslu_pid_check <pid> <cmdline text>`
+
+  Check whether a pid is alive and its command line contains the given text; a pid file can outlive its process and the pid can be reused.
+- `wslu_tunnel_close <control socket>`
+
+  End the ssh master behind a wslview --on tunnel control socket and remove the socket together with its recorded port.
 - `wslu_file_check <check_location> <file>`
 
   Check whether a file exist in the corresbonding location. If not, it will copy from the source folder (`/<PREFIX>/share/wslu`).
