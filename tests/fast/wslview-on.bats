@@ -11,14 +11,38 @@ setup() {
   printf 'win\n' > "$WSLU_TEST_ROOT/mnt/c/Temp/rep.pdf"
   printf '\nWSLVIEW_ON_PORT=18090\n' >> "$WSLU_DESTDIR/usr/share/wslu/conf"
   make_instrumented_command wslview '
+    flag_value() {
+      local want="$1" prev="" a
+      shift
+      for a in "$@"; do
+        if [ "$prev" == "$want" ]; then
+          printf '%s' "$a"
+          return 0
+        fi
+        prev="$a"
+      done
+      return 1
+    }
     ssh() {
       printf "ssh %s\n" "$*" >> "$WSLU_TEST_LOG"
       if [[ "$*" == *"-fN"* ]]; then
-        local prev="" a
-        for a in "$@"; do
-          [ "$prev" == "-S" ] && touch "$a"
-          prev="$a"
-        done
+        if [ -n "${TEST_SSH_OTHER_FAIL:-}" ]; then
+          echo "ssh: connect to host mytarget port 22: Connection refused" >&2
+          return 255
+        fi
+        local sockfile
+        sockfile="$(flag_value -S "$@")"
+        [ -n "$sockfile" ] && touch "$sockfile"
+      fi
+      if [[ "$*" == *"-R"* ]]; then
+        local rport
+        rport="$(flag_value -R "$@")"
+        rport="${rport%%:*}"
+        case " ${TEST_SSH_BUSY_PORTS:-} " in
+          *" $rport "*)
+            echo "Warning: remote port forwarding failed for listen port $rport" >&2
+            return 1;;
+        esac
       fi
       if [[ "$*" == *"tar -xf -"* ]]; then
         cat > /dev/null
@@ -34,6 +58,13 @@ setup() {
     }
     copyparty() {
       printf "copyparty %s\n" "$*" >> "$WSLU_TEST_LOG"
+      local cport
+      cport="$(flag_value -p "$@")"
+      if [ -n "$cport" ]; then
+        case " ${TEST_CP_BUSY_PORTS:-} " in
+          *" $cport "*) return 1;;
+        esac
+      fi
       exec -a copyparty sleep 60
     }
     sleep() { :; }
@@ -72,21 +103,21 @@ teardown() {
   [ "$status" -eq 0 ]
   assert_called "copyparty -i 127.0.0.1 --http-only -p 18090"
   assert_called ":/docs:rw"
-  assert_called "http://localhost:18090/docs/"
+  assert_called "http://localhost:18190/docs/"
   assert_called "ssh -fN"
 }
 
 @test "wslview --on - source names are readable" {
   run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs/my dir"
   [ "$status" -eq 0 ]
-  assert_called "http://localhost:18090/my-dir/"
+  assert_called "http://localhost:18190/my-dir/"
 }
 
 @test "wslview --on - duplicate names get a numeric suffix" {
   run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs" "$WSLU_TEST_ROOT/other/docs"
   [ "$status" -eq 0 ]
-  assert_called "http://localhost:18090/docs/"
-  assert_called "http://localhost:18090/docs-2/"
+  assert_called "http://localhost:18190/docs/"
+  assert_called "http://localhost:18190/docs-2/"
 }
 
 @test "wslview --on - a nested directory reuses the parent source and the server" {
@@ -94,7 +125,7 @@ teardown() {
   [ "$status" -eq 0 ]
   run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs"
   [ "$status" -eq 0 ]
-  assert_called "http://localhost:18090/shared/docs"
+  assert_called "http://localhost:18190/shared/docs"
   [ "$(grep -c -- "copyparty -i" "$WSLU_TEST_LOG")" -eq 1 ]
   [ "$(wc -l < "$XDG_STATE_HOME/wslu/wslview-on-sources")" -eq 1 ]
 }
@@ -104,7 +135,7 @@ teardown() {
   [ "$status" -eq 0 ]
   run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/other"
   [ "$status" -eq 0 ]
-  assert_called "http://localhost:18090/other/"
+  assert_called "http://localhost:18190/other/"
   [ "$(wc -l < "$XDG_STATE_HOME/wslu/wslview-on-sources")" -eq 2 ]
   [ -f "$XDG_STATE_HOME/wslu/wslview-on-server.pid" ]
 }
@@ -155,7 +186,7 @@ teardown() {
 @test "wslview --on --reveal opens the parent directory read-only" {
   run "$BATS_TEST_TMPDIR/wslview" --on mytarget --reveal "$WSLU_TEST_ROOT/shared/docs/a b.txt"
   [ "$status" -eq 0 ]
-  assert_called "http://localhost:18090/docs/"
+  assert_called "http://localhost:18190/docs/"
   assert_called ":/docs:r"
   refute_called ":/docs:rw"
   refute_called "inbox"
@@ -169,13 +200,34 @@ teardown() {
   assert_called ":/docs:rw"
 }
 
-@test "wslview --on - an existing tunnel is reused" {
-  export TEST_SSH_CHECK_UP=1
-  run "$BATS_TEST_TMPDIR/wslview" --on mytarget https://example.com/
+@test "wslview --on - an existing tunnel is reused with its recorded port" {
+  run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs"
   [ "$status" -eq 0 ]
-  refute_called "ssh -fN"
+  export TEST_SSH_CHECK_UP=1
+  run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c -- "ssh -fN" "$WSLU_TEST_LOG")" -eq 1 ]
+  assert_called "http://localhost:18190/docs/"
 }
 
+@test "wslview --on - a lost port file rebuilds the tunnel" {
+  run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs"
+  [ "$status" -eq 0 ]
+  rm -f "$XDG_STATE_HOME/wslu"/wslview-on-*.port
+  export TEST_SSH_CHECK_UP=1
+  run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs"
+  [ "$status" -eq 0 ]
+  assert_called "http://localhost:18190/docs/"
+  assert_called "-O exit"
+}
+
+@test "wslview --on - a non-forward ssh failure is not retried" {
+  export TEST_SSH_OTHER_FAIL=1
+  run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Connection refused"* ]]
+  [ "$(grep -c -- "ssh -fN" "$WSLU_TEST_LOG")" -eq 1 ]
+}
 @test "wslview --on - remote failure propagates its exit code" {
   export TEST_SSH_RC=7
   run "$BATS_TEST_TMPDIR/wslview" --on mytarget https://example.com/
@@ -188,6 +240,32 @@ teardown() {
   assert_called "exec wslview --engine cmd_explorer"
 }
 
+@test "wslview --on - the tunnel port falls forward when taken on the target" {
+  export TEST_SSH_BUSY_PORTS="18190"
+  run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs"
+  [ "$status" -eq 0 ]
+  assert_called "-R 18191:localhost:18090"
+  assert_called "http://localhost:18191/docs/"
+}
+
+@test "wslview --on - the server port falls forward when taken locally" {
+  export TEST_CP_BUSY_PORTS="18090"
+  run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs"
+  [ "$status" -eq 0 ]
+  assert_called "copyparty -i 127.0.0.1 --http-only -p 18091"
+  assert_called "-R 18190:localhost:18091"
+}
+
+@test "wslview --on - a server restart on a new port closes stale tunnels" {
+  run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs"
+  [ "$status" -eq 0 ]
+  export TEST_CP_BUSY_PORTS="18090"
+  run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/other"
+  [ "$status" -eq 0 ]
+  assert_called "-O exit"
+  assert_called "-R 18190:localhost:18091"
+}
+
 @test "wslview --on --stop tears down tunnels, server, and all state" {
   run "$BATS_TEST_TMPDIR/wslview" --on mytarget "$WSLU_TEST_ROOT/shared/docs"
   [ "$status" -eq 0 ]
@@ -197,6 +275,7 @@ teardown() {
   [ ! -f "$XDG_STATE_HOME/wslu/wslview-on-server.pid" ]
   [ ! -f "$XDG_STATE_HOME/wslu/wslview-on-sources" ]
   [ ! -f "$XDG_STATE_HOME/wslu/wslview-on-server.args" ]
+  [ -z "$(ls "$XDG_STATE_HOME/wslu"/wslview-on-*.port 2>/dev/null)" ]
 }
 
 @test "wslview --stop without --on is rejected" {

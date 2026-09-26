@@ -78,8 +78,9 @@
 # is not running, wslview launches powershell.exe itself. Can be `true` or `false`.
 # WSLVIEW_USE_HELPER=true
 
-# wslview --on: the loopback port of the file server and of the ssh reverse tunnel
-# that carries it to the target. Change it if the port is taken on either side.
+# wslview --on: the loopback port of the file server. The ssh reverse tunnel to a
+# target forwards one hundred above the configured value; both fall forward when
+# a port is taken.
 # WSLVIEW_ON_PORT=8090
 
 # wslview --on: days a copied file may stay in the target inbox

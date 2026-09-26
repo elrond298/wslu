@@ -61,7 +61,9 @@ Configuration defaults:
   WSLVIEW_USE_HELPER=true            Launch through the resident helper when WSL can
                                      reach the Windows loopback; set to false to always
                                      launch powershell.exe directly.
-  WSLVIEW_ON_PORT=8090          Loopback port of the file server and the tunnel.
+  WSLVIEW_ON_PORT=8090          Loopback port of the file server. The tunnel to a
+                                target forwards one hundred above the configured
+                                value; both fall forward when a port is taken.
   WSLVIEW_ON_INBOX_TTL=7        Days a copied file may stay in the target inbox
 
 wslview opens a URL exactly as given, without probing it first. Earlier versions sent an
@@ -268,6 +270,10 @@ WSLVIEW_ON_PORT=${WSLVIEW_ON_PORT:-8090}
 WSLVIEW_ON_INBOX_TTL=${WSLVIEW_ON_INBOX_TTL:-7}
 wslview_on_sources_file="${wslu_state_dir}/wslview-on-sources"
 wslview_on_server_args="${wslu_state_dir}/wslview-on-server.args"
+wslview_on_server_port_file="${wslu_state_dir}/wslview-on-server.port"
+wslview_on_url_port=""
+wslview_on_tunnel_offset=100
+wslview_on_port_window=5
 wslview_on_server_pid_file="${wslu_state_dir}/wslview-on-server.pid"
 
 # Classify one LINK_OR_FILE argument, shared by the local and the --on paths.
@@ -330,7 +336,7 @@ function wslview_on_encode() {
 # Browser URL for an absolute directory, registering it with the file server on
 # first use. $2 is rw for an opened directory and r for a --reveal parent; a
 # directory inside an exposed one reuses that source, upgraded to rw on request.
-function wslview_on_url_for() {
+function wslview_on_source_for() {
 	local path="$1" want="$2" best="" bestname="" bestperm="" rel base candidate i tmp
 	local sname spath sperm
 	local -a taken=()
@@ -356,7 +362,7 @@ function wslview_on_url_for() {
 			i=$((i + 1))
 		done
 		printf '%s\t%s\t%s\n' "$candidate" "$path" "$want" >> "$wslview_on_sources_file"
-		printf 'http://localhost:%s/%s/' "$WSLVIEW_ON_PORT" "$candidate"
+		printf '%s/' "$candidate"
 		return 0
 	fi
 	if [ "$want" == "rw" ] && [ "$bestperm" != "rw" ]; then
@@ -370,10 +376,18 @@ function wslview_on_url_for() {
 	rel="${path#"$best"}"
 	rel="${rel#/}"
 	if [ -n "$rel" ]; then
-		printf 'http://localhost:%s/%s/%s' "$WSLVIEW_ON_PORT" "$bestname" "$(wslview_on_encode "$rel")"
+		printf '%s/%s' "$bestname" "$(wslview_on_encode "$rel")"
 	else
-		printf 'http://localhost:%s/%s/' "$WSLVIEW_ON_PORT" "$bestname"
+		printf '%s/' "$bestname"
 	fi
+}
+
+# True while the pid lives and its cmdline still identifies our file server;
+# the pid file can outlive the process and the pid can be reused.
+function wslview_on_pid_alive() {
+	local pid="$1"
+	kill -0 "$pid" 2>/dev/null || return 1
+	[ -r "/proc/$pid/cmdline" ] && grep -qa "copyparty" "/proc/$pid/cmdline"
 }
 
 function wslview_on_server_running() {
@@ -381,10 +395,7 @@ function wslview_on_server_running() {
 	[ -f "$wslview_on_server_pid_file" ] || return 1
 	pid=$(<"$wslview_on_server_pid_file")
 	[[ "$pid" =~ ^[0-9]+$ ]] || return 1
-	kill -0 "$pid" 2>/dev/null || return 1
-	# the pid file can outlive the process and the pid can be reused; only
-	# trust it while the process cmdline still says copyparty
-	[ -r "/proc/$pid/cmdline" ] && grep -qa "copyparty" "/proc/$pid/cmdline"
+	wslview_on_pid_alive "$pid"
 }
 
 function wslview_on_server_stop() {
@@ -398,12 +409,44 @@ function wslview_on_server_stop() {
 
 # Remove every piece of file server state; nothing outlives --stop or a server.
 function wslview_on_state_clear() {
-	rm -f "$wslview_on_sources_file" "$wslview_on_server_args" "$wslview_on_server_pid_file"
+	rm -f "$wslview_on_sources_file" "$wslview_on_server_args" "$wslview_on_server_pid_file" \
+		"$wslview_on_server_port_file"
+}
+
+# Close every tunnel; their forwards die with the server they point at.
+function wslview_on_tunnels_stop() {
+	local sock port_file
+	for sock in "$wslu_state_dir"/wslview-on-*.sock; do
+		[ -e "$sock" ] || continue
+		ssh -S "$sock" -O exit _ >/dev/null 2>&1 || true
+		rm -f "$sock" "${sock%.sock}.port"
+	done
+	# a master that died on its own leaves its port file behind
+	for port_file in "$wslu_state_dir"/wslview-on-*.port; do
+		[ "$port_file" == "$wslview_on_server_port_file" ] && continue
+		rm -f "$port_file"
+	done
+}
+
+# The local port of the running server, or the default before it starts.
+function wslview_on_server_port() {
+	local p="" pid=""
+	[ -f "$wslview_on_server_port_file" ] && p=$(<"$wslview_on_server_port_file")
+	if ! [[ "$p" =~ ^[0-9]+$ ]]; then
+		# recover a lost port file from the server cmdline, which carries -p PORT
+		[ -f "$wslview_on_server_pid_file" ] && pid=$(<"$wslview_on_server_pid_file")
+		if [[ "$pid" =~ ^[0-9]+$ ]] && wslview_on_pid_alive "$pid"; then
+			p=$(tr '\0' '\n' < "/proc/$pid/cmdline" | awk '/^-p$/ { getline; print; exit }')
+		fi
+	fi
+	[[ "$p" =~ ^[0-9]+$ ]] || p="$WSLVIEW_ON_PORT"
+	printf '%s' "$p"
 }
 
 # Start the loopback-bound file server unless it runs with the same volumes.
+# The port falls forward when taken: a target tunnel may already hold it.
 function wslview_on_server_ensure() {
-	local pid i sname spath sperm
+	local pid i port old_port sname spath sperm
 	local -a vol_args=()
 	command -v copyparty >/dev/null 2>&1 || error_echo "Browsing on a target needs copyparty on PATH; install copyparty or open a single file instead." 34
 	while IFS=$'\t' read -r sname spath sperm; do
@@ -414,38 +457,72 @@ function wslview_on_server_ensure() {
 	if wslview_on_server_running && cmp -s "$wslview_on_sources_file" "$wslview_on_server_args"; then
 		return 0
 	fi
+	old_port="$(wslview_on_server_port)"
 	wslview_on_server_stop
-	cp "$wslview_on_sources_file" "$wslview_on_server_args"
 	# --http-only skips the TLS sniff, which 400s and corrupts the stream when the
 	# request arrives fragmented (normal through an ssh tunnel).
-	copyparty -i 127.0.0.1 --http-only -p "$WSLVIEW_ON_PORT" "${vol_args[@]}" >/dev/null 2>&1 &
-	pid=$!
-	printf '%s\n' "$pid" > "$wslview_on_server_pid_file"
-	disown 2>/dev/null || true
-	for (( i = 0; i < 75; i++ )); do
-		if timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$WSLVIEW_ON_PORT" 2>/dev/null; then
-			debug_echo "wslview_on_server_ensure: ready on port $WSLVIEW_ON_PORT"
+	for (( port = WSLVIEW_ON_PORT; port < WSLVIEW_ON_PORT + wslview_on_port_window; port++ )); do
+		copyparty -i 127.0.0.1 --http-only -p "$port" "${vol_args[@]}" >/dev/null 2>&1 &
+		pid=$!
+		printf '%s\n' "$pid" > "$wslview_on_server_pid_file"
+		disown 2>/dev/null || true
+		for (( i = 0; i < 75; i++ )); do
+			if timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null; then
+				break
+			fi
+			kill -0 "$pid" 2>/dev/null || break
+			sleep 0.2
+		done
+		# the probe can connect to a foreign listener before copyparty binds (or
+		# fails to); settle, then trust only our own process
+		sleep 0.3
+		if wslview_on_pid_alive "$pid"; then
+			cp "$wslview_on_sources_file" "$wslview_on_server_args"
+			printf '%s\n' "$port" > "$wslview_on_server_port_file"
+			if [ "$old_port" != "$port" ]; then
+				wslview_on_tunnels_stop
+			fi
+			debug_echo "wslview_on_server_ensure: serving on port $port"
 			return 0
 		fi
-		kill -0 "$pid" 2>/dev/null || error_echo "The file server exited; check the copyparty installation and WSLVIEW_ON_PORT for a conflict." 1
-		sleep 0.2
 	done
-	debug_echo "wslview_on_server_ensure: not ready yet, continuing"
-	return 0
+	wslview_on_server_stop
+	error_echo "The file server could not start; check the copyparty installation. Ports $WSLVIEW_ON_PORT..$((WSLVIEW_ON_PORT + wslview_on_port_window - 1)) may also all be taken." 1
 }
 
 function wslview_on_tunnel_ensure() {
-	local sock="$1"
-	if ssh -S "$sock" -O check "$on_target" >/dev/null 2>&1; then
-		debug_echo "wslview_on_tunnel_ensure: reusing tunnel to $on_target"
-		return 0
+	local sock="$1" port_file="${1%.sock}.port" remote local_port try err
+	local_port="$(wslview_on_server_port)"
+	# reuse only a tunnel whose recorded port can be trusted
+	if [ -f "$port_file" ] && ssh -S "$sock" -O check "$on_target" >/dev/null 2>&1; then
+		wslview_on_url_port=$(<"$port_file")
+		if [[ "$wslview_on_url_port" =~ ^[0-9]+$ ]]; then
+			debug_echo "wslview_on_tunnel_ensure: reusing tunnel to $on_target on port $wslview_on_url_port"
+			return 0
+		fi
 	fi
-	rm -f "$sock"
-	ssh -fN -M -S "$sock" -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
-		-o ConnectTimeout=10 -R "$WSLVIEW_ON_PORT:localhost:$WSLVIEW_ON_PORT" "$on_target" \
-		|| error_echo "Could not open a tunnel to $on_target. Run ssh $on_target to diagnose; the target must allow reverse forwarding." 1
-	debug_echo "wslview_on_tunnel_ensure: tunnel to $on_target forwards port $WSLVIEW_ON_PORT"
-	return 0
+	# no trustworthy port: close whatever is there and build fresh
+	ssh -S "$sock" -O exit _ >/dev/null 2>&1 || true
+	rm -f "$sock" "$port_file"
+	# the remote port starts one hundred above the configured port so the two
+	# roles never share a number (a mutual setup would be ambiguous otherwise),
+	# then falls forward when taken on the target
+	for (( try = 0; try < wslview_on_port_window; try++ )); do
+		remote=$((WSLVIEW_ON_PORT + wslview_on_tunnel_offset + try))
+		if err="$(ssh -fN -M -S "$sock" -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
+			-o ConnectTimeout=10 -R "$remote:localhost:$local_port" "$on_target" 2>&1)"; then
+			printf '%s\n' "$remote" > "$port_file"
+			wslview_on_url_port="$remote"
+			debug_echo "wslview_on_tunnel_ensure: tunnel to $on_target forwards $remote to localhost:$local_port"
+			return 0
+		fi
+		rm -f "$sock"
+		case "$err" in
+			*"forwarding failed"*) ;; # that port is taken on the target; try the next
+			*) error_echo "Could not open a tunnel to $on_target. ${err:-ssh failed}." 1;;
+		esac
+	done
+	error_echo "Could not open a tunnel to $on_target. Ports $((WSLVIEW_ON_PORT + wslview_on_tunnel_offset))..$((WSLVIEW_ON_PORT + wslview_on_tunnel_offset + wslview_on_port_window - 1)) are all taken on the target; run ssh $on_target to diagnose." 1
 }
 
 # Deepest common directory of the given absolute paths.
@@ -464,22 +541,19 @@ function wslview_on_common_dir() {
 function wslview_on_run() {
 	local sock
 	sock="${wslu_state_dir}/wslview-on-$(wslview_on_target_id "$on_target").sock"
-	local lname properfile entry f rel common runid remote_cmd rc wpath
-	local -a remote_args=() file_args=() rel_args=() pipe_status=()
+	local lname properfile entry f rel common runid remote_cmd rc wpath idx
+	local -a remote_args=() file_args=() rel_args=() pipe_status=() dir_parts=()
 	local need_browser=0 need_copy=0
 
 	[[ "$WSLVIEW_ON_PORT" =~ ^[0-9]+$ ]] || error_echo "WSLVIEW_ON_PORT must be a number." 22
 	[[ "$WSLVIEW_ON_INBOX_TTL" =~ ^[0-9]+$ ]] || error_echo "WSLVIEW_ON_INBOX_TTL must be a number of days." 22
 	if ! wslview_on_server_running; then
 		wslview_on_state_clear
+		wslview_on_tunnels_stop
 	fi
 
 	if [ "$on_stop" -eq 1 ]; then
-		for sock in "$wslu_state_dir"/wslview-on-*.sock; do
-			[ -e "$sock" ] || continue
-			ssh -S "$sock" -O exit _ >/dev/null 2>&1 || true
-			rm -f "$sock"
-		done
+		wslview_on_tunnels_stop
 		wslview_on_server_stop
 		wslview_on_state_clear
 		debug_echo "wslview_on_run: tunnels, file server, and state cleared"
@@ -497,8 +571,7 @@ function wslview_on_run() {
 			error_echo "--reveal requires an existing Linux path or a Windows path." 22
 		fi
 		# the parent is shared read-only: reveal only points at it
-		entry="$(wslview_on_url_for "$(dirname "$properfile")" r)"
-		remote_args+=("$(wslview_on_quote "$entry")")
+		dir_parts+=("$(wslview_on_source_for "$(dirname "$properfile")" r)")
 		need_browser=1
 	else
 		[ "$link_argument_set" -eq 1 ] || error_echo "wslview --on TARGET needs LINK_OR_FILE, --reveal PATH, or --stop." 21
@@ -523,8 +596,7 @@ function wslview_on_run() {
 			esac
 			if [ -n "$properfile" ]; then
 				if [ -d "$properfile" ]; then
-					entry="$(wslview_on_url_for "$properfile" rw)"
-					remote_args+=("$(wslview_on_quote "$entry")")
+					dir_parts+=("$(wslview_on_source_for "$properfile" rw)")
 					need_browser=1
 				else
 					file_args+=("$properfile")
@@ -540,6 +612,10 @@ function wslview_on_run() {
 		wslview_on_server_ensure
 		wslview_on_tunnel_ensure "$sock"
 	fi
+
+	for idx in "${!dir_parts[@]}"; do
+		remote_args+=("$(wslview_on_quote "http://localhost:$wslview_on_url_port/${dir_parts[$idx]}")")
+	done
 
 	if [ "$need_copy" -eq 1 ]; then
 		runid="$(date +%Y-%m-%d_%H%M%S)-$$"

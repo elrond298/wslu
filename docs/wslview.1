@@ -77,7 +77,7 @@ accepted for compatibility and ignored. It is still validated, so it must be `0`
 whether to launch through the resident helper that ships with wslu. Default is "true". Can be either `true` or `false`. Set to "false" to always launch \fBpowershell.exe\fR directly.
 .TP
 .B WSLVIEW_ON_PORT
-the loopback port of the file server and of the ssh reverse tunnel. Change it when the port is taken on either side. Default is 8090.
+the loopback port of the file server. The ssh reverse tunnel forwards one hundred above the configured value (so the two roles never share a number on a target), and each falls forward to the next port when taken; browsing URLs use the port actually bound on the target. Default is 8090.
 .TP
 .B WSLVIEW_ON_INBOX_TTL
 days a copied file may stay in the target inbox (\fB~/.cache/wslu/inbox\fR) before a later copy call prunes it. Nothing else removes copied files from the target. Default is 7.
